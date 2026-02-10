@@ -1,0 +1,6 @@
+# Ignore local saved phrases
+saved_phrases.txt
+
+# Ignore editor swap files
+*.swp
+*.swo
