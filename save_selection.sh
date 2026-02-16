@@ -4,7 +4,7 @@
 # Works on both X11 and Wayland (GNOME/Sway/etc.)
 
 # -------- CONFIG --------
-STORAGE_FILE="$HOME/saved_phrases.txt"
+STORAGE_FILE="$HOME/Dropbox/saved_phrases.txt"
 MIN_LENGTH=3        # ignore phrases shorter than this
 MAX_NOTIFY=50       # max characters shown in notification
 # ------------------------

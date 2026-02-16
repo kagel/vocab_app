@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# vocab-google-once.sh
+# translate_pop.sh
 # One-time: pick random phrase → check cache → translate if needed → notify → exit
 # Cache: ~/Dropbox/translated_cache.txt    format: "original"\t"translated" (tab separated)
 
