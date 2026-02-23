@@ -1,87 +1,125 @@
-# Save Selection Script
+# Vocabulary App
 
-A lightweight, cross-platform (X11/Wayland) Bash script to quickly save selected text to a file on Linux. Designed for intelligent deduplication, trimming, and notifications, making it ideal for capturing phrases, ideas, or language learning snippets.
+A lightweight, cross-platform (X11/Wayland) Bash vocabulary learning toolkit for Linux. Save phrases, review them with spaced repetition, and track your progress.
 
 ## Features
 
-- Works on X11 and Wayland automatically.
-- Deduplicates intelligently:
-  - Case-insensitive
-  - Ignores leading/trailing whitespace
-  - Ignores trivial/very short selections (configurable).
-- Desktop notifications for:
-  - New phrase saved
-  - Duplicate ignored
-  - Invalid selection
-- Minimal dependencies, fully local, and future-proof.
+- **Save phrases**: Select text anywhere, press a hotkey, done
+- **Spaced repetition**: Words you struggle with appear more often
+- **Learning levels**: Track progress from new (☆) to mastered (★★★★★)
+- **Translation cache**: Automatic translation via Google Translate API
+- **Stats dashboard**: See words learned, reviews today/week/month
+- **Cross-platform**: Works on X11 and Wayland automatically
+- **Case-insensitive**: "Hello" and "hello" are treated as the same phrase
+
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `vocab_save.sh` | Save selected text to vocabulary |
+| `vocab_show.sh` | Continuous popup loop with translations |
+| `vocab_discard.sh` | Remove current phrase (bind to hotkey) |
+| `vocab_stats.sh` | Display learning statistics |
+| `vocab_config.sh` | Shared configuration |
 
 ## Dependencies
 
-**X11:** `xclip`
 ```bash
+# Core
+sudo apt install curl jq notify-send
+
+# X11
 sudo apt install xclip
-```
 
-**Wayland:** `wl-clipboard`
-```bash
+# Wayland
 sudo apt install wl-clipboard
-```
-
-**Notifications:** `notify-send` (usually provided by `libnotify-bin`)
-```bash
-sudo apt install libnotify-bin
 ```
 
 ## Installation
 
-1. Download or copy the script to your home directory:
+1. Clone or copy scripts to a folder:
    ```bash
-   cp save_selection.sh ~/save_selection.sh
+   mkdir -p ~/vocab_app/scripts
+   cd ~/vocab_app/scripts
+   # Copy scripts here
+   chmod +x *.sh
    ```
 
-2. Make the script executable:
-   ```bash
-   chmod +x ~/save_selection.sh
-   ```
+2. Bind keyboard shortcuts:
+   - `vocab_save.sh` → `Ctrl+Alt+S` (save selection)
+   - `vocab_discard.sh` → `Ctrl+Alt+D` (discard current phrase)
 
-3. Create the storage file (if it doesn't exist):
+3. Start the popup loop:
    ```bash
-   touch ~/saved_phrases.txt
+   ./vocab_show.sh
    ```
-
-4. Assign a keyboard shortcut in your desktop environment:
-   - **Command:** `/home/yourusername/save_selection.sh`
-   - **Shortcut:** e.g., `Ctrl+Alt+S`
 
 ## Usage
 
-1. Select text anywhere (browser, terminal, editor, etc.).
-2. Press your keyboard shortcut (e.g., `Ctrl+Alt+S`).
-3. The selected text is saved to `~/saved_phrases.txt` if it is not a duplicate.
-4. Desktop notifications indicate:
-   - New phrase saved
-   - Duplicate ignored
-   - No valid selection
+### Saving Phrases
+1. Select text in any application
+2. Press your `vocab_save.sh` hotkey
+3. Phrase is saved (lowercased, deduplicated)
 
-**Notes:**
-- Very short selections (less than `MIN_LENGTH`, default 3 characters) are ignored.
-- Notifications show a maximum of `MAX_NOTIFY` characters (default 50) for readability.
+### Reviewing
+1. Run `vocab_show.sh` (autostart recommended)
+2. Phrases appear periodically as notifications
+3. Wait for translation to reveal
+4. Stars indicate learning level: `[★★]` = level 2
+
+### Discarding Boring Phrases
+1. When a phrase appears you already know
+2. Press your `vocab_discard.sh` hotkey
+3. Phrase is removed from all files
+
+### Checking Stats
+```bash
+./vocab_stats.sh        # Basic stats
+./vocab_stats.sh -v     # Show mastered phrases
+```
 
 ## Configuration
 
-You can tweak the script by editing the following variables at the top of `save_selection.sh`:
+Edit `vocab_config.sh`:
 
 ```bash
-STORAGE_FILE="$HOME/saved_phrases.txt"  # Path to storage file
-MIN_LENGTH=3                            # Minimum length of phrase to save
-MAX_NOTIFY=50                           # Max characters shown in notifications
+# Base directory (all files stored here)
+VOCAB_DIR="$HOME/Dropbox/vocab_app"
+
+# Translation target language
+TARGET_LANG="ru"
+
+# Popup timing
+SLEEP_INTERVAL=600      # Seconds between words
+REVEAL_DELAY=4          # Seconds before showing translation
+
+# File limits
+MAX_CACHE_LINES=5000
+MAX_HISTORY_LINES=1000
 ```
 
-## Optional Improvements / Future Enhancements
+## File Structure
 
-- Add categories/tags via `dmenu` or `rofi` to organize phrases.
-- Maintain a rolling history for undo.
-- Export saved phrases to Markdown, Anki, or JSON.
-- Auto-copy saved phrase back to clipboard for instant reuse.
-- Limit storage file size automatically if it grows too large.
-- Add search functionality to quickly find previously saved phrases.
+```
+$VOCAB_DIR/
+├── saved_phrases.txt    # Your vocabulary
+├── translated_cache.txt # Cached translations
+├── vocab_history.txt    # Review history
+└── vocab_levels.txt     # Learning levels (0-5)
+```
+
+## Spaced Repetition
+
+Phrases are assigned levels 0-5:
+- **Level 0** (☆): New word, shown frequently
+- **Level 1-3** (★): Learning, shown less often
+- **Level 4-5** (★★): Mastered, rarely shown
+
+Each time you see a phrase, its level increases. This means words you've reviewed many times (and likely know well) appear less often than new words.
+
+## Tips
+
+- Autostart `vocab_show.sh` via your desktop's session settings
+- Use `vocab_discard.sh` liberally - remove words you already know
+- Check `vocab_stats.sh -v` to see your mastered words
+- Sync `$VOCAB_DIR` via Dropbox/Syncthing for multi-device access
