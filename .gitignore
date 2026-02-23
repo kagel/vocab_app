@@ -4,3 +4,5 @@ saved_phrases.txt
 # Ignore editor swap files
 *.swp
 *.swo
+
+.idea/
