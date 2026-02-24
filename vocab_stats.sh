@@ -8,7 +8,7 @@
 #   ./vocab_stats.sh       # Basic stats
 #   ./vocab_stats.sh -v    # Verbose (shows mastered phrases)
 
-set -e
+set -euo pipefail
 
 # Get script directory and load config
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -66,22 +66,26 @@ fi
 
 # ==================== LEVEL DISTRIBUTION ====================
 
-# Initialize level counters (0-5)
-level_counts=(0 0 0 0 0 0)
+now=$(date +%s)
 
-# Count phrases at each level
+new_count=0
+short_interval=0
+long_interval=0
+
 if [[ -f "$LEVELS_FILE" ]]; then
-    while IFS=$'\t' read -r phrase level; do
-        [[ -z "$level" ]] && continue
-        [[ "$level" =~ ^[0-9]+$ ]] || continue
-        level_counts[$level]=$((level_counts[level] + 1))
+    while IFS=$'\t' read -r phrase interval due ease; do
+        [[ -z "$phrase" || -z "$interval" ]] && continue
+        [[ "$interval" =~ ^[0-9]+$ ]] || continue
+        
+        if [[ -z "$due" || $due -eq 0 || $due -lt $now ]]; then
+            new_count=$((new_count + 1))
+        elif [[ $interval -le 7 ]]; then
+            short_interval=$((short_interval + 1))
+        else
+            long_interval=$((long_interval + 1))
+        fi
     done < "$LEVELS_FILE"
 fi
-
-# Aggregate into categories
-new_words=${level_counts[0]}
-learning=$((level_counts[1] + level_counts[2] + level_counts[3]))
-mastered=$((level_counts[4] + level_counts[5]))
 
 # ==================== DISPLAY ====================
 
@@ -97,30 +101,29 @@ printf '║  Today:                %10s  ║\n' "$today_count"
 printf '║  This week:            %10s  ║\n' "$week_count"
 printf '║  This month:           %10s  ║\n' "$month_count"
 printf '╠════════════════════════════════════╣\n'
-printf '║  Progress by level:                ║\n'
-printf '║  ☆ New (0):            %10s  ║\n' "${level_counts[0]}"
-printf '║  ★ Level 1-3:          %10s  ║\n' "$learning"
-printf '║  ★★ Level 4-5:         %10s  ║\n' "$mastered"
+printf '║  Progress by interval:             ║\n'
+printf '║  ✎ Due/overdue:        %10s  ║\n' "$new_count"
+printf '║  → Short (≤7 days):    %10s  ║\n' "$short_interval"
+printf '║  ✓ Long (>7 days):     %10s  ║\n' "$long_interval"
 printf '╚════════════════════════════════════╝\n'
 
 # ==================== VERBOSE OUTPUT ====================
 
-# If -v flag, show recently mastered phrases
-if [[ "$1" == "-v" ]] && [[ -f "$LEVELS_FILE" ]]; then
+if [[ "${1:-}" == "-v" ]] && [[ -f "$LEVELS_FILE" ]]; then
     echo ""
-    echo "Recently mastered (level 4-5):"
+    echo "Words with long intervals (>30 days):"
     
-    while IFS=$'\t' read -r phrase level; do
-        # Skip non-mastered phrases
-        [[ "$level" =~ ^[4-5]$ ]] || continue
+    while IFS=$'\t' read -r phrase interval due ease; do
+        [[ -z "$phrase" || -z "$interval" ]] && continue
+        [[ "$interval" =~ ^[0-9]+$ ]] || continue
+        [[ $interval -le 30 ]] && continue
         
-        # Build star indicator
-        stars=""
-        for ((i=0; i<level; i++)); do
-            stars+="★"
-        done
+        if [[ $interval -lt 365 ]]; then
+            label="$interval days"
+        else
+            label="$((interval / 365)) yr"
+        fi
         
-        # Display (truncate long phrases)
-        echo "  [$stars] ${phrase:0:50}"
+        echo "  [$label] ${phrase:0:50}"
     done < "$LEVELS_FILE" | tail -10
 fi

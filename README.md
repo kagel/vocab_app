@@ -5,8 +5,8 @@ A lightweight, cross-platform (X11/Wayland) Bash vocabulary learning toolkit for
 ## Features
 
 - **Save phrases**: Select text anywhere, press a hotkey, done
-- **Spaced repetition**: Words you struggle with appear more often
-- **Learning levels**: Track progress from new (☆) to mastered (★★★★★)
+- **Spaced repetition**: SM-2 algorithm for optimal review scheduling
+- **Learning levels**: Shows next review interval (1 day → 3 days → 2 mo → 1 yr)
 - **Translation cache**: Automatic translation via Google Translate API
 - **Stats dashboard**: See words learned, reviews today/week/month
 - **Cross-platform**: Works on X11 and Wayland automatically
@@ -65,7 +65,7 @@ sudo apt install wl-clipboard
 1. Run `vocab_show.sh` (autostart recommended)
 2. Phrases appear periodically as notifications
 3. Wait for translation to reveal
-4. Stars indicate learning level: `[★★]` = level 2
+4. Brackets show next review interval: `[1 day]`, `[3 days]`, `[2 mo]`
 
 ### Discarding Boring Phrases
 1. When a phrase appears you already know
@@ -93,6 +93,12 @@ TARGET_LANG="ru"
 SLEEP_INTERVAL=600      # Seconds between words
 REVEAL_DELAY=4          # Seconds before showing translation
 
+# SM-2 Spaced Repetition
+SM2_INITIAL_INTERVAL=1  # Days for first review
+SM2_EASE_FACTOR=2.5      # Interval multiplier
+SM2_MIN_EASE=1.3         # Minimum ease factor
+SM2_MAX_INTERVAL=180     # Maximum interval (days)
+
 # File limits
 MAX_CACHE_LINES=5000
 MAX_HISTORY_LINES=1000
@@ -105,17 +111,19 @@ $VOCAB_DIR/
 ├── saved_phrases.txt    # Your vocabulary
 ├── translated_cache.txt # Cached translations
 ├── vocab_history.txt    # Review history
-└── vocab_levels.txt     # Learning levels (0-5)
+└── vocab_levels.txt     # SM-2 data: phrase | interval | due_date | ease_factor
 ```
 
 ## Spaced Repetition
 
-Phrases are assigned levels 0-5:
-- **Level 0** (☆): New word, shown frequently
-- **Level 1-3** (★): Learning, shown less often
-- **Level 4-5** (★★): Mastered, rarely shown
+Uses the **SM-2 algorithm** with passive time-based scheduling:
 
-Each time you see a phrase, its level increases. This means words you've reviewed many times (and likely know well) appear less often than new words.
+- **First review**: 1 day interval
+- **Subsequent reviews**: `interval × ease_factor` (default 2.5x)
+- **Ease factor**: Increases slightly with each review (minimum 1.3)
+- **Maximum interval**: 180 days (≈6 months)
+
+Words become "due" after their interval passes. Overdue words are prioritized for review. New words have highest priority since they have no due date.
 
 ## Tips
 

@@ -37,6 +37,12 @@ TARGET_LANG="ru"
 # Minimum phrase length to save (shorter = ignored)
 MIN_LENGTH=3
 
+# ==================== SPACED REPETITION SETTINGS ====================
+SM2_INITIAL_INTERVAL=1
+SM2_EASE_FACTOR=2.5
+SM2_MIN_EASE=1.3
+SM2_MAX_INTERVAL=180
+
 # ==================== POPUP LOOP SETTINGS ====================
 # Seconds between showing words
 SLEEP_INTERVAL=600

@@ -58,7 +58,7 @@ fi
 # ==================== IN-MEMORY CACHE ====================
 
 declare -A CACHE_TRANS
-declare -A PHRASE_LEVELS
+declare -A PHRASE_DATA
 
 load_cache() {
     CACHE_TRANS=()
@@ -73,11 +73,10 @@ load_cache() {
 }
 
 load_levels() {
-    PHRASE_LEVELS=()
-    while IFS=$'\t' read -r phrase level; do
-        [[ -z "$phrase" || -z "$level" ]] && continue
-        [[ "$level" =~ ^[0-9]+$ ]] || continue
-        PHRASE_LEVELS["$phrase"]="$level"
+    PHRASE_DATA=()
+    while IFS=$'\t' read -r phrase interval due ease; do
+        [[ -z "$phrase" ]] && continue
+        PHRASE_DATA[$phrase]="$interval|$due|$ease"
     done < "$LEVELS_FILE"
 }
 
@@ -86,21 +85,54 @@ get_cached_translation() {
     echo "${CACHE_TRANS["$phrase"]}"
 }
 
-get_level() {
+get_sm2_data() {
     local phrase="$1"
-    echo "${PHRASE_LEVELS["$phrase"]:-0}"
+    [[ -z "$phrase" ]] && echo "$SM2_INITIAL_INTERVAL|0|$SM2_EASE_FACTOR" && return
+    local data="${PHRASE_DATA[$phrase]}"
+    if [[ -z "$data" ]]; then
+        echo "$SM2_INITIAL_INTERVAL|0|$SM2_EASE_FACTOR"
+    else
+        echo "$data"
+    fi
 }
 
-increment_level() {
+get_interval() {
     local phrase="$1"
-    local current_level=${PHRASE_LEVELS["$phrase"]:-0}
-    local new_level=$((current_level + 1))
-    [[ $new_level -gt 5 ]] && new_level=5
-    PHRASE_LEVELS["$phrase"]="$new_level"
+    local interval
+    interval=$(get_sm2_data | cut -d'|' -f1)
+    echo "${interval:-1}"
+}
+
+update_sm2() {
+    local phrase="$1"
+    local now=$(date +%s)
     
-    # Update levels file (remove old entry case-insensitively)
+    local interval due ease
+    read -r interval due ease <<< "$(get_sm2_data | tr '|' ' ')"
+    
+    interval=${interval:-$SM2_INITIAL_INTERVAL}
+    ease=${ease:-$SM2_EASE_FACTOR}
+    due=${due:-0}
+    
+    local new_interval new_due new_ease
+    
+    if [[ $due -eq 0 || $((now - due)) -lt 0 ]]; then
+        new_ease=$ease
+        new_interval=$interval
+    else
+        new_ease=$(awk "BEGIN {printf \"%.1f\", $ease + 0.1}")
+        [[ $(awk "BEGIN {print $new_ease < $SM2_MIN_EASE}") -eq 1 ]] && new_ease=$SM2_MIN_EASE
+        
+        new_interval=$(awk "BEGIN {printf \"%.0f\", $interval * $new_ease}")
+        [[ $new_interval -gt $SM2_MAX_INTERVAL ]] && new_interval=$SM2_MAX_INTERVAL
+    fi
+    
+    new_due=$((now + new_interval * 86400))
+    
+    PHRASE_DATA[$phrase]="$new_interval|$new_due|$new_ease"
+    
     grep -viF "$phrase"$'\t' "$LEVELS_FILE" > "$LEVELS_FILE.tmp" 2>/dev/null || true
-    printf '%s\t%s\n' "$phrase" "$new_level" >> "$LEVELS_FILE.tmp"
+    printf '%s\t%s\t%s\t%s\n' "$phrase" "$new_interval" "$new_due" "$new_ease" >> "$LEVELS_FILE.tmp"
     mv "$LEVELS_FILE.tmp" "$LEVELS_FILE"
 }
 
@@ -110,37 +142,40 @@ load_levels
 
 # ==================== SPACED REPETITION ====================
 
-# Get selection weight based on level (lower = shown less often)
-get_weight() {
-    local level="$1"
-    case "$level" in
-        0) echo 100 ;;
-        1) echo 50 ;;
-        2) echo 25 ;;
-        3) echo 12 ;;
-        4) echo 6 ;;
-        5) echo 3 ;;
-        *) echo 25 ;;
-    esac
+get_urgency() {
+    local phrase="$1"
+    local now=$(date +%s)
+    local interval due ease
+    read -r interval due ease <<< "$(get_sm2_data | tr '|' ' ')"
+    
+    if [[ -z "$due" || $due -eq 0 ]]; then
+        echo 100
+        return
+    fi
+    
+    local overdue=$((now - due))
+    
+    if [[ $overdue -gt 0 ]]; then
+        echo $((100 + overdue / 3600))
+    else
+        echo 10
+    fi
 }
 
-# Weighted random selection using cumulative weights (O(n) instead of O(n*weight))
 weighted_select() {
     local -n arr=$1
     local total=0
-    local phrase weight
+    local phrase urgency
     
     for phrase in "${arr[@]}"; do
-        local level=${PHRASE_LEVELS["$phrase"]:-0}
-        ((total += $(get_weight "$level")))
+        ((total += $(get_urgency "$phrase")))
     done
     
     local rand=$((RANDOM * RANDOM % total))
     local running=0
     
     for phrase in "${arr[@]}"; do
-        local level=${PHRASE_LEVELS["$phrase"]:-0}
-        ((running += $(get_weight "$level")))
+        ((running += $(get_urgency "$phrase")))
         ((rand < running)) && { echo "$phrase"; return; }
     done
     
@@ -202,8 +237,8 @@ while true; do
     echo "$(date +%s)	$original" >> "$HISTORY_FILE"
     prune_history
     
-    # Increment learning level
-    increment_level "$original"
+    # Update SM-2 intervals
+    update_sm2 "$original"
     
     # Get translation (from cache or API)
     translated=$(translate_phrase "$original")
@@ -213,24 +248,29 @@ while true; do
         continue
     fi
     
-    # Build level indicator (stars)
-    level=$(get_level "$original")
-    level_indicator=""
-    for ((i=0; i<level; i++)); do
-        level_indicator+="★"
-    done
-    [[ -n "$level_indicator" ]] && level_indicator=" [$level_indicator]"
+    # Get interval info
+    interval=$(get_interval "$original")
+    if [[ $interval -eq 1 ]]; then
+        interval_indicator="1 day"
+    elif [[ $interval -lt 30 ]]; then
+        interval_indicator="$interval days"
+    elif [[ $interval -lt 365 ]]; then
+        interval_indicator="$((interval / 30)) mo"
+    else
+        interval_indicator="$((interval / 365)) yr"
+    fi
+    interval_indicator=" [$interval_indicator]"
     
     # Show phrase first (without translation)
     notify-send -i "$ICON_TRANSLATE" -u "$NOTIFY_URGENCY" -t $((REVEAL_DELAY * 1000)) \
-        "" "<b>$original</b>$level_indicator"
+        "" "<b>$original</b>$interval_indicator"
     
     # Wait before revealing translation
     sleep "$REVEAL_DELAY"
     
     # Show phrase with translation
     notify-send -i "$ICON_TRANSLATE" -u "$NOTIFY_URGENCY" -t "$NOTIFY_TIMEOUT" \
-        "" "<b>$original</b>$level_indicator\n→ $translated"
+        "" "<b>$original</b>$interval_indicator\n→ $translated"
     
     # Wait until next word
     sleep "$SLEEP_INTERVAL"
