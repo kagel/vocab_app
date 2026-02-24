@@ -56,13 +56,23 @@ SELECTED=$(echo "$SELECTED" | tr '[:upper:]' '[:lower:]' | tr -d '\r\n' | sed 's
 
 # Skip empty or too-short selections
 if [ -z "$SELECTED" ] || [ "${#SELECTED}" -lt "$MIN_LENGTH" ]; then
-    notify-send "No valid selection detected"
+    notify-send -i "$ICON_TRANSLATE" "No valid selection detected"
     exit 0
 fi
 
 # Check for duplicates (case-insensitive exact match, though phrases are stored lowercase)
 if grep -iqFx "$SELECTED" "$VOCAB_FILE" 2>/dev/null; then
-    notify-send "Duplicate ignored" "${SELECTED:0:$MAX_NOTIFY}"
+    existing_trans=$(get_cached_translation "$SELECTED")
+    if [[ -n "$existing_trans" ]]; then
+        notify-send -i "$ICON_TRANSLATE" "Already saved" "${SELECTED:0:$MAX_NOTIFY} → $existing_trans"
+    else
+        new_trans=$(translate_phrase "$SELECTED") || new_trans=""
+        if [[ -n "$new_trans" ]]; then
+            notify-send -i "$ICON_TRANSLATE" "Already saved" "${SELECTED:0:$MAX_NOTIFY} → $new_trans"
+        else
+            notify-send -i "$ICON_TRANSLATE" "Already saved" "${SELECTED:0:$MAX_NOTIFY}"
+        fi
+    fi
     exit 0
 fi
 
@@ -78,7 +88,7 @@ translation=$(translate_phrase "$SELECTED") || translation=""
 # Confirm to user (truncate long phrases)
 TRUNCATED="${SELECTED:0:$MAX_NOTIFY}"
 if [[ -n "$translation" ]]; then
-    notify-send "Saved" "$TRUNCATED → $translation"
+    notify-send -i "$ICON_TRANSLATE" "Saved" "$TRUNCATED → $translation"
 else
-    notify-send "Saved new selection" "$TRUNCATED"
+    notify-send -i "$ICON_TRANSLATE" "Saved new selection" "$TRUNCATED"
 fi

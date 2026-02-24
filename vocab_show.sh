@@ -35,7 +35,7 @@ fi
 
 # ==================== DEPENDENCY CHECK ====================
 
-for cmd in curl jq notify-send shuf tail grep sed wc awk date; do
+for cmd in curl jq notify-send awk date; do
     command -v "$cmd" >/dev/null || {
         notify-send -u critical "Vocab Error" "$cmd missing"
         exit 1
@@ -55,68 +55,96 @@ if [[ ! -s "$VOCAB_FILE" ]]; then
     exit 1
 fi
 
-# ==================== SPACED REPETITION FUNCTIONS ====================
+# ==================== IN-MEMORY CACHE ====================
 
-# Get learning level for a phrase (0-5, default 0)
-# Uses case-insensitive matching
-get_level() {
-    local phrase="$1"
-    local level
-    level=$(grep -iF "$phrase" "$LEVELS_FILE" 2>/dev/null | head -1 | cut -f2)
-    echo "${level:-0}"
+declare -A CACHE_TRANS
+declare -A PHRASE_LEVELS
+
+load_cache() {
+    CACHE_TRANS=()
+    while IFS=$'\t' read -r phrase trans; do
+        [[ -z "$phrase" ]] && continue
+        phrase="${phrase#\"}"
+        phrase="${phrase%\"}"
+        trans="${trans#\"}"
+        trans="${trans%\"}"
+        CACHE_TRANS["$phrase"]="$trans"
+    done < "$CACHE_FILE"
 }
 
-# Increment phrase level (capped at 5)
-# Higher level = seen more often = needs more practice
+load_levels() {
+    PHRASE_LEVELS=()
+    while IFS=$'\t' read -r phrase level; do
+        [[ -z "$phrase" || -z "$level" ]] && continue
+        [[ "$level" =~ ^[0-9]+$ ]] || continue
+        PHRASE_LEVELS["$phrase"]="$level"
+    done < "$LEVELS_FILE"
+}
+
+get_cached_translation() {
+    local phrase="$1"
+    echo "${CACHE_TRANS["$phrase"]}"
+}
+
+get_level() {
+    local phrase="$1"
+    echo "${PHRASE_LEVELS["$phrase"]:-0}"
+}
+
 increment_level() {
     local phrase="$1"
-    local current_level
-    current_level=$(get_level "$phrase")
+    local current_level=${PHRASE_LEVELS["$phrase"]:-0}
     local new_level=$((current_level + 1))
     [[ $new_level -gt 5 ]] && new_level=5
+    PHRASE_LEVELS["$phrase"]="$new_level"
     
     # Update levels file (remove old entry case-insensitively)
-    # Match phrase followed by tab to avoid partial matches
     grep -viF "$phrase"$'\t' "$LEVELS_FILE" > "$LEVELS_FILE.tmp" 2>/dev/null || true
     printf '%s\t%s\n' "$phrase" "$new_level" >> "$LEVELS_FILE.tmp"
     mv "$LEVELS_FILE.tmp" "$LEVELS_FILE"
 }
 
-# Get selection weight based on level
-# Lower level = lower weight = shown less often
-# This creates inverse spaced repetition effect
+# Load initial cache and levels
+load_cache
+load_levels
+
+# ==================== SPACED REPETITION ====================
+
+# Get selection weight based on level (lower = shown less often)
 get_weight() {
     local level="$1"
     case "$level" in
-        0) echo 100 ;;  # New word: very likely
-        1) echo 50 ;;   # Seen once
-        2) echo 25 ;;   # Learning
-        3) echo 12 ;;   # Getting familiar
-        4) echo 6 ;;    # Almost mastered
-        5) echo 3 ;;    # Mastered: rarely shown
+        0) echo 100 ;;
+        1) echo 50 ;;
+        2) echo 25 ;;
+        3) echo 12 ;;
+        4) echo 6 ;;
+        5) echo 3 ;;
         *) echo 25 ;;
     esac
 }
 
-# Weighted random selection
-# Phrases with higher weights are more likely to be picked
-weighted_shuffle() {
-    local -a phrases=("${!1}")
-    local -a weighted=()
+# Weighted random selection using cumulative weights (O(n) instead of O(n*weight))
+weighted_select() {
+    local -n arr=$1
+    local total=0
+    local phrase weight
     
-    for phrase in "${phrases[@]}"; do
-        local level
-        level=$(get_level "$phrase")
-        local weight
-        weight=$(get_weight "$level")
-        # Add phrase 'weight' times to array
-        for ((i=0; i<weight; i++)); do
-            weighted+=("$phrase")
-        done
+    for phrase in "${arr[@]}"; do
+        local level=${PHRASE_LEVELS["$phrase"]:-0}
+        ((total += $(get_weight "$level")))
     done
     
-    # Random pick from weighted pool
-    printf '%s\n' "${weighted[@]}" | shuf -n 1
+    local rand=$((RANDOM * RANDOM % total))
+    local running=0
+    
+    for phrase in "${arr[@]}"; do
+        local level=${PHRASE_LEVELS["$phrase"]:-0}
+        ((running += $(get_weight "$level")))
+        ((rand < running)) && { echo "$phrase"; return; }
+    done
+    
+    echo "${arr[0]}"
 }
 
 # ==================== CACHE FUNCTIONS ====================
@@ -140,44 +168,29 @@ echo "Press Ctrl+C to stop."
 
 while true; do
     
-    # Load all phrases from vocabulary file
-    # Trim whitespace and skip empty lines
-    mapfile -t ALL_LINES < <(
-        sed 's/^[[:space:]]*//;s/[[:space:]]*$//' "$VOCAB_FILE" | grep -v '^$'
-    )
+    # Load all phrases using awk (faster than sed+grep in subshell)
+    mapfile -t ALL_LINES < <(awk 'NF {gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' "$VOCAB_FILE")
     
     # Skip if no phrases available
     [[ ${#ALL_LINES[@]} -eq 0 ]] && sleep "$SLEEP_INTERVAL" && continue
     
-    # Get recently shown phrases to avoid repetition
-    RECENT=$(tail -n "$RECENT_LIMIT" "$HISTORY_FILE")
-    
-    # Identify phrases not yet in translation cache
-    mapfile -t UNSEEN < <(
-        for line in "${ALL_LINES[@]}"; do
-            [[ -z $(get_cached_translation "$line") ]] && echo "$line"
-        done
-    )
-    
-    # Prefer unseen phrases, fallback to all
-    if [[ ${#UNSEEN[@]} -gt 0 ]]; then
-        choose_from=("${UNSEEN[@]}")
-    else
-        choose_from=("${ALL_LINES[@]}")
-    fi
-    
-    # Filter out recently shown phrases (case-insensitive)
-    filtered=()
-    for line in "${choose_from[@]}"; do
-        echo "$RECENT" | grep -iqFx "$line" || filtered+=("$line")
+    # Get recently shown phrases as associative array for O(1) lookup
+    declare -A recent_set
+    tail -n "$RECENT_LIMIT" "$HISTORY_FILE" | while IFS=$'\t' read -r _ phrase; do
+        [[ -n "$phrase" ]] && recent_set["$phrase"]=1
     done
-
-    if [[ ${#filtered[@]} -gt 0 ]]; then
-        choose_from=("${filtered[@]}")
-    fi
     
-    # Select phrase using weighted shuffle (spaced repetition)
-    original=$(weighted_shuffle choose_from[@])
+    # Build list of phrases not in recent set
+    choose_from=()
+    for line in "${ALL_LINES[@]}"; do
+        [[ -z "${recent_set["$line"]}" ]] && choose_from+=("$line")
+    done
+    
+    # Fallback to all if filtered empty
+    [[ ${#choose_from[@]} -eq 0 ]] && choose_from=("${ALL_LINES[@]}")
+    
+    # Select phrase using weighted selection (spaced repetition)
+    original=$(weighted_select choose_from)
     
     # Skip if somehow empty
     [[ ${#original} -lt 2 ]] && sleep "$SLEEP_INTERVAL" && continue
@@ -209,14 +222,14 @@ while true; do
     [[ -n "$level_indicator" ]] && level_indicator=" [$level_indicator]"
     
     # Show phrase first (without translation)
-    notify-send -u "$NOTIFY_URGENCY" -t $((REVEAL_DELAY * 1000)) \
+    notify-send -i "$ICON_TRANSLATE" -u "$NOTIFY_URGENCY" -t $((REVEAL_DELAY * 1000)) \
         "" "<b>$original</b>$level_indicator"
     
     # Wait before revealing translation
     sleep "$REVEAL_DELAY"
     
     # Show phrase with translation
-    notify-send -u "$NOTIFY_URGENCY" -t "$NOTIFY_TIMEOUT" \
+    notify-send -i "$ICON_TRANSLATE" -u "$NOTIFY_URGENCY" -t "$NOTIFY_TIMEOUT" \
         "" "<b>$original</b>$level_indicator\n→ $translated"
     
     # Wait until next word

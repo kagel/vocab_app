@@ -18,7 +18,7 @@ source "$SCRIPT_DIR/vocab_config.sh"
 # Acquire lock to prevent concurrent modifications
 exec 9>"$LOCK_FILE_FILES"
 if ! flock -n 9; then
-    notify-send "Busy" "Try again"
+    notify-send -i "$ICON_TRANSLATE" "Busy" "Try again"
     exit 1
 fi
 
@@ -26,14 +26,14 @@ fi
 
 # Check if there's a current phrase to discard
 if [[ ! -f "$CURRENT_PHRASE_FILE" ]]; then
-    notify-send "Discard" "No phrase to discard"
+    notify-send -i "$ICON_TRANSLATE" "Discard" "No phrase to discard"
     exit 1
 fi
 
 PHRASE=$(cat "$CURRENT_PHRASE_FILE")
 
 if [[ -z "$PHRASE" ]]; then
-    notify-send "Discard" "No phrase to discard"
+    notify-send -i "$ICON_TRANSLATE" "Discard" "No phrase to discard"
     exit 1
 fi
 
@@ -65,4 +65,4 @@ fi
 rm -f "$CURRENT_PHRASE_FILE"
 
 # Notify user (truncate long phrases)
-notify-send "Discarded" "${PHRASE:0:$MAX_NOTIFY}"
+notify-send -i "$ICON_TRANSLATE" "Discarded" "${PHRASE:0:$MAX_NOTIFY}"

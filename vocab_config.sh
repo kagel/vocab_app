@@ -25,6 +25,11 @@ LOCK_FILE_FILES="/tmp/vocab_files.lock"
 # Temp file for current phrase (used by discard)
 CURRENT_PHRASE_FILE="/tmp/last_vocab_phrase"
 
+# ==================== ICONS ====================
+# Bundled icons (relative to script directory)
+VOCAB_ICON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/icons"
+ICON_TRANSLATE="$VOCAB_ICON_DIR/translate.svg"
+
 # ==================== BEHAVIOR SETTINGS ====================
 # Translation target language (ISO 639-1 code)
 TARGET_LANG="ru"
