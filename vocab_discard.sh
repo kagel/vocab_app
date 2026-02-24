@@ -54,6 +54,11 @@ if [[ -f "$LEVELS_FILE" ]]; then
     grep -viF "$PHRASE"$'\t' "$LEVELS_FILE" > "$LEVELS_FILE.tmp" && mv "$LEVELS_FILE.tmp" "$LEVELS_FILE"
 fi
 
+# Remove from translation cache
+if [[ -f "$CACHE_FILE" ]]; then
+    grep -viF "\"$PHRASE\"" "$CACHE_FILE" > "$CACHE_FILE.tmp" && mv "$CACHE_FILE.tmp" "$CACHE_FILE"
+fi
+
 # ==================== CLEANUP ====================
 
 # Clear current phrase file

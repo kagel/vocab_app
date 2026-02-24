@@ -58,3 +58,53 @@ RECENT_LIMIT=30
 # ==================== DISPLAY SETTINGS ====================
 # Max characters shown in notifications
 MAX_NOTIFY=50
+
+# ==================== TRANSLATION FUNCTIONS ====================
+
+get_cached_translation() {
+    local phrase="$1"
+    local line
+    line=$(grep -iF "\"$phrase\""$'\t' "$CACHE_FILE" 2>/dev/null | head -n 1)
+    
+    if [[ -n "$line" ]]; then
+        local trans="${line#*$'\t'}"
+        trans="${trans#\"}"
+        echo "${trans%\"}"
+    fi
+}
+
+translate_phrase() {
+    local phrase="$1"
+    local translated
+    
+    cached=$(get_cached_translation "$phrase")
+    
+    if [[ -n "$cached" ]]; then
+        echo "$cached"
+        return 0
+    fi
+    
+    local q_encoded
+    q_encoded=$(printf '%s' "$phrase" | jq -sRr @uri)
+    
+    local response
+    response=$(curl -s -m 12 \
+        "https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${TARGET_LANG}&dt=t&q=${q_encoded}")
+    
+    translated=$(echo "$response" | jq -r '.[0][0][0] // empty')
+    
+    if [[ -z "$translated" ]]; then
+        return 1
+    fi
+    
+    translated=$(echo "$translated" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    
+    printf '"%s"\t"%s"\n' "$phrase" "$translated" >> "$CACHE_FILE"
+    
+    if [[ $(wc -l < "$CACHE_FILE") -gt $MAX_CACHE_LINES ]]; then
+        tail -n "$MAX_CACHE_LINES" "$CACHE_FILE" > "$CACHE_FILE.tmp" \
+            && mv -f "$CACHE_FILE.tmp" "$CACHE_FILE"
+    fi
+    
+    echo "$translated"
+}

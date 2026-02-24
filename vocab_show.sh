@@ -121,25 +121,7 @@ weighted_shuffle() {
 
 # ==================== CACHE FUNCTIONS ====================
 
-# Get cached translation for a phrase (case-insensitive)
-# Returns translation if found, empty string if not
-# Uses grep for speed (faster than bash loop for large files)
-get_cached_translation() {
-    local phrase="$1"
-    
-    # Use -F for fixed string matching (safe with special chars like . * [ ?)
-    # Pattern: "phrase"\t matches our cache format at line start
-    local line
-    line=$(grep -iF "\"$phrase\""$'\t' "$CACHE_FILE" 2>/dev/null | head -n 1)
-
-    if [[ -n "$line" ]]; then
-        # Extract translation (everything after first tab)
-        local trans="${line#*$'\t'}"
-        # Strip surrounding quotes
-        trans="${trans#\"}"
-        echo "${trans%\"}"
-    fi
-}
+# get_cached_translation and translate_phrase are now in vocab_config.sh
 
 # ==================== UTILITY FUNCTIONS ====================
 
@@ -211,38 +193,11 @@ while true; do
     increment_level "$original"
     
     # Get translation (from cache or API)
-    cached=$(get_cached_translation "$original")
+    translated=$(translate_phrase "$original")
     
-    if [[ -n "$cached" ]]; then
-        # Use cached translation
-        translated="$cached"
-    else
-        # Call Google Translate API
-        q_encoded=$(printf '%s' "$original" | jq -sRr @uri)
-        
-        response=$(curl -s -m 12 \
-            "https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${TARGET_LANG}&dt=t&q=${q_encoded}")
-        
-        # Extract translation from JSON response
-        translated=$(echo "$response" | jq -r '.[0][0][0] // empty')
-        
-        # Skip if translation failed
-        if [[ -z "$translated" ]]; then
-            sleep "$SLEEP_INTERVAL"
-            continue
-        fi
-        
-        # Normalize translation
-        translated=$(echo "$translated" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-        
-        # Save to cache (quoted format: "phrase"\t"translation")
-        printf '"%s"\t"%s"\n' "$original" "$translated" >> "$CACHE_FILE"
-        
-        # Prune cache if too large
-        if [[ $(wc -l < "$CACHE_FILE") -gt $MAX_CACHE_LINES ]]; then
-            tail -n "$MAX_CACHE_LINES" "$CACHE_FILE" > "$CACHE_FILE.tmp" \
-                && mv -f "$CACHE_FILE.tmp" "$CACHE_FILE"
-        fi
+    if [[ -z "$translated" ]]; then
+        sleep "$SLEEP_INTERVAL"
+        continue
     fi
     
     # Build level indicator (stars)

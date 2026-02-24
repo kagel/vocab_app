@@ -15,6 +15,15 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/vocab_config.sh"
 
+# ==================== DEPENDENCY CHECK ====================
+
+for cmd in jq curl; do
+    command -v "$cmd" >/dev/null || {
+        notify-send "Error" "$cmd missing"
+        exit 1
+    }
+done
+
 # ==================== MAIN ====================
 
 # Acquire lock to prevent concurrent file modifications
@@ -60,6 +69,16 @@ fi
 # Append to vocabulary file
 echo "$SELECTED" >> "$VOCAB_FILE"
 
+# Store for discard script
+echo "$SELECTED" > "$CURRENT_PHRASE_FILE"
+
+# Get and cache translation
+translation=$(translate_phrase "$SELECTED") || translation=""
+
 # Confirm to user (truncate long phrases)
 TRUNCATED="${SELECTED:0:$MAX_NOTIFY}"
-notify-send "Saved new selection" "$TRUNCATED"
+if [[ -n "$translation" ]]; then
+    notify-send "Saved" "$TRUNCATED → $translation"
+else
+    notify-send "Saved new selection" "$TRUNCATED"
+fi
