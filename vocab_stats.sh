@@ -39,6 +39,11 @@ month_count=0
 now=$(date +%s)
 day_secs=$((60 * 60 * 24))
 
+# Calculate start of today, this week, and this month
+today_start=$(date -d 'today 00:00:00' +%s)
+week_start=$(date -d 'last Sunday 00:00:00' +%s)
+month_start=$(date -d "$(date +%Y-%m-01) 00:00:00" +%s)
+
 # Count reviews in each time period
 if [[ -f "$HISTORY_FILE" ]]; then
     while IFS=$'\t' read -r timestamp phrase; do
@@ -46,17 +51,14 @@ if [[ -f "$HISTORY_FILE" ]]; then
         [[ -z "$timestamp" ]] && continue
         [[ "$timestamp" =~ ^[0-9]+$ ]] || continue
         
-        # Calculate age of this review
-        diff=$((now - timestamp))
-        
-        # Increment appropriate counter
-        if ((diff < day_secs)); then
+        # Count reviews from each period
+        if ((timestamp >= today_start)); then
             today_count=$((today_count + 1))
         fi
-        if ((diff < day_secs * 7)); then
+        if ((timestamp >= week_start)); then
             week_count=$((week_count + 1))
         fi
-        if ((diff < day_secs * 30)); then
+        if ((timestamp >= month_start)); then
             month_count=$((month_count + 1))
         fi
     done < "$HISTORY_FILE"
