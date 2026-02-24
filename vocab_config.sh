@@ -95,16 +95,13 @@ translate_phrase() {
         return 0
     fi
     
-    local q_encoded
-    q_encoded=$(printf '%s' "$phrase" | jq -sRr @uri)
-    
     local response
-    response=$(curl -s -m 12 \
-        "https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${TARGET_LANG}&dt=t&q=${q_encoded}")
+    response=$(curl -s -m 12 --data-urlencode "q=$phrase" \
+        "https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${TARGET_LANG}&dt=t")
     
-    translated=$(echo "$response" | jq -r '.[0][0][0] // empty')
+    translated=$(echo "$response" | sed -n 's/\[\[\["\([^"]*\)".*/\1/p')
     
-    if [[ -z "$translated" ]]; then
+    if [[ -z "$translated" || "$translated" == "$response" ]]; then
         return 1
     fi
     

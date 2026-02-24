@@ -17,7 +17,7 @@ source "$SCRIPT_DIR/vocab_config.sh"
 
 # ==================== DEPENDENCY CHECK ====================
 
-for cmd in jq curl; do
+for cmd in curl; do
     command -v "$cmd" >/dev/null || {
         notify-send "Error" "$cmd missing"
         exit 1

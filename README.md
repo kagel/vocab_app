@@ -26,7 +26,7 @@ A lightweight, cross-platform (X11/Wayland) Bash vocabulary learning toolkit for
 
 ```bash
 # Core
-sudo apt install curl jq notify-send
+sudo apt install curl notify-send
 
 # X11
 sudo apt install xclip

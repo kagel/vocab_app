@@ -35,7 +35,7 @@ fi
 
 # ==================== DEPENDENCY CHECK ====================
 
-for cmd in curl jq notify-send awk date; do
+for cmd in curl notify-send awk date; do
     command -v "$cmd" >/dev/null || {
         notify-send -u critical "Vocab Error" "$cmd missing"
         exit 1
