@@ -99,7 +99,7 @@ get_sm2_data() {
 get_interval() {
     local phrase="$1"
     local interval
-    interval=$(get_sm2_data | cut -d'|' -f1)
+    interval=$(get_sm2_data "$phrase" | cut -d'|' -f1)
     echo "${interval:-1}"
 }
 
