@@ -136,9 +136,11 @@ update_sm2() {
     mv "$LEVELS_FILE.tmp" "$LEVELS_FILE"
 }
 
-# Load initial cache and levels
+# Load initial cache, levels, and vocabulary
 load_cache
 load_levels
+
+mapfile -t ALL_LINES < <(awk 'NF {gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' "$VOCAB_FILE")
 
 # ==================== SPACED REPETITION ====================
 
@@ -201,10 +203,14 @@ prune_history() {
 echo "Vocab loop started. Interval: $SLEEP_INTERVAL seconds"
 echo "Press Ctrl+C to stop."
 
+iteration=0
+
 while true; do
     
-    # Load all phrases using awk (faster than sed+grep in subshell)
-    mapfile -t ALL_LINES < <(awk 'NF {gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' "$VOCAB_FILE")
+    # Reload vocab periodically to pick up new words
+    if (( ++iteration % RELOAD_EVERY == 0 )); then
+        mapfile -t ALL_LINES < <(awk 'NF {gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' "$VOCAB_FILE")
+    fi
     
     # Skip if no phrases available
     [[ ${#ALL_LINES[@]} -eq 0 ]] && sleep "$SLEEP_INTERVAL" && continue

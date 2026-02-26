@@ -44,8 +44,8 @@ SM2_MIN_EASE=1.3
 SM2_MAX_INTERVAL=180
 
 # ==================== POPUP LOOP SETTINGS ====================
-# Seconds between showing words
-SLEEP_INTERVAL=600
+# Seconds between showing words (~24/day = 1 hour, gives buffer for missed days)
+SLEEP_INTERVAL=3600
 
 # Seconds before revealing translation
 REVEAL_DELAY=4
@@ -65,6 +65,9 @@ MAX_HISTORY_LINES=1000
 
 # Avoid showing these many most recent phrases
 RECENT_LIMIT=30
+
+# Reload vocab file every N iterations
+RELOAD_EVERY=100
 
 # ==================== DISPLAY SETTINGS ====================
 # Max characters shown in notifications
