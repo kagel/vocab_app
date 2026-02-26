@@ -108,7 +108,7 @@ update_sm2() {
     local now=$(date +%s)
     
     local interval due ease
-    read -r interval due ease <<< "$(get_sm2_data | tr '|' ' ')"
+    read -r interval due ease <<< "$(get_sm2_data "$phrase" | tr '|' ' ')"
     
     interval=${interval:-$SM2_INITIAL_INTERVAL}
     ease=${ease:-$SM2_EASE_FACTOR}
@@ -146,7 +146,7 @@ get_urgency() {
     local phrase="$1"
     local now=$(date +%s)
     local interval due ease
-    read -r interval due ease <<< "$(get_sm2_data | tr '|' ' ')"
+    read -r interval due ease <<< "$(get_sm2_data "$phrase" | tr '|' ' ')"
     
     if [[ -z "$due" || $due -eq 0 ]]; then
         echo 100
@@ -209,11 +209,11 @@ while true; do
     # Skip if no phrases available
     [[ ${#ALL_LINES[@]} -eq 0 ]] && sleep "$SLEEP_INTERVAL" && continue
     
-    # Get recently shown phrases as associative array for O(1) lookup
+    # Get recently shown phrases for O(1) lookup
     declare -A recent_set
-    tail -n "$RECENT_LIMIT" "$HISTORY_FILE" | while IFS=$'\t' read -r _ phrase; do
+    while IFS=$'\t' read -r _ phrase; do
         [[ -n "$phrase" ]] && recent_set["$phrase"]=1
-    done
+    done < <(tail -n "$RECENT_LIMIT" "$HISTORY_FILE")
     
     # Build list of phrases not in recent set
     choose_from=()
