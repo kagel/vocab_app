@@ -157,7 +157,7 @@ get_urgency() {
     
     local overdue=$((now - due))
     
-    if [[ $overdue -gt 0 ]]; then
+    if ((overdue > 0)); then
         echo $((100 + overdue / 3600))
     else
         echo 10
