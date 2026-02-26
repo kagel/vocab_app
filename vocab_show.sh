@@ -116,7 +116,7 @@ update_sm2() {
     
     local new_interval new_due new_ease
     
-    if [[ $due -eq 0 || $((now - due)) -lt 0 ]]; then
+    if [[ $due -ne 0 && $((now - due)) -lt 0 ]]; then
         new_ease=$ease
         new_interval=$interval
     else
