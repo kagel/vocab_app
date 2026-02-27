@@ -43,7 +43,8 @@ class VocabService:
         if enable:
             os.makedirs(autostart_dir, exist_ok=True)
             script_path = os.path.dirname(os.path.abspath(__file__))
-            venv_python = os.path.join(script_path, "venv", "bin", "python3")
+            # venv is in project root, not in src/
+            venv_python = os.path.join(os.path.dirname(script_path), "venv", "bin", "python3")
             exec_path = os.path.join(script_path, "vocab_gui.py")
             
             if os.path.exists(venv_python):

@@ -3,6 +3,9 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 echo "Setting up Vocab GUI app..."
 
 # Detect package manager
@@ -22,7 +25,6 @@ elif command -v apt &>/dev/null; then
         python3-gi-cairo \
         gir1.2-gtk-3.0 \
         gir1.2-appindicator3-0.1
-    # python3-requests is installed via pip (requirements.txt)
 
 else
     echo "Unsupported package manager. Please install manually:"
@@ -40,14 +42,14 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 # Make scripts executable
-chmod +x vocab_gui.py
+chmod +x src/vocab_gui.py
 
 echo ""
 echo "Setup complete!"
 echo ""
 echo "To run the app:"
 echo "  source venv/bin/activate"
-echo "  python3 vocab_gui.py"
+echo "  python3 src/vocab_gui.py"
 echo ""
 echo "To start on login, add to your desktop's autostart:"
-echo "  /path/to/gui/venv/bin/python3 /path/to/gui/vocab_gui.py"
+echo "  $SCRIPT_DIR/venv/bin/python3 $SCRIPT_DIR/src/vocab_gui.py"

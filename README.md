@@ -14,12 +14,11 @@ A lightweight vocabulary learning app with system tray and spaced repetition. Su
 
 ## GUI App (Recommended)
 
-Located in `gui/` folder - modern GTK3 interface with system tray.
+Located in `src/` folder - modern GTK3 interface with system tray.
 
 ### Setup
 
 ```bash
-cd gui
 ./setup.sh
 ```
 
@@ -27,7 +26,7 @@ cd gui
 
 ```bash
 source venv/bin/activate
-python3 vocab_gui.py
+python3 src/vocab_gui.py
 ```
 
 ### Keyboard Shortcuts (XFCE)
@@ -36,9 +35,9 @@ Configure in XFCE Settings → Keyboard → Application Shortcuts:
 
 | Command | Purpose |
 |---------|---------|
-| `python3 /path/to/vocab_gui.py --save` | Save selected text |
-| `python3 /path/to/vocab_gui.py --delete` | Delete current word |
-| `python3 /path/to/vocab_gui.py --next` | Show next word |
+| `python3 /path/to/src/vocab_gui.py --save` | Save selected text |
+| `python3 /path/to/src/vocab_gui.py --delete` | Delete current word |
+| `python3 /path/to/src/vocab_gui.py --next` | Show next word |
 
 ### Settings
 
