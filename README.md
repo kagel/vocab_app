@@ -26,6 +26,9 @@ A lightweight vocabulary learning app with system tray and spaced repetition. Su
 ### Statistics Window
 ![Stats](docs/screenshot-stats.png)
 
+### Popup Translation Message
+![Stats](docs/screenshot-message.png)
+
 ## GUI App (Recommended)
 
 Located in `src/` folder - modern GTK3 interface with system tray.
