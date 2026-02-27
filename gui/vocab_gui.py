@@ -5,12 +5,11 @@ import os
 import sys
 import threading
 import time
-import tempfile
 
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('AppIndicator3', '0.1')
-from gi.repository import Gtk, AppIndicator3, GLib
+from gi.repository import Gtk, AppIndicator3
 
 from db import Database
 from vocab import VocabService
@@ -146,9 +145,11 @@ class VocabTrayApp:
                 if word:
                     self.current_word = word
                     self.show_word_popup(word)
-
-                # Wait for next review
-                time.sleep(interval)
+                    # Wait full interval after showing word
+                    time.sleep(interval)
+                else:
+                    # No words due, check again in 5 minutes
+                    time.sleep(300)
 
             except Exception as e:
                 print(f"Review loop error: {e}")

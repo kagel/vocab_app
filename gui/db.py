@@ -85,7 +85,7 @@ class Database:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.engine = create_engine(f'sqlite:///{db_path}', echo=False)
-        self.Session = sessionmaker(bind=self.engine)
+        self.Session = sessionmaker(bind=self.engine, expire_on_commit=False)
         self._session: Optional[Session] = None
 
     @property
@@ -204,13 +204,6 @@ class Database:
             word_id=word_id, language_id=lang.id
         ).first()
         return trans.translation if trans else None
-
-    def get_any_translation(self, word_id: int) -> Optional[tuple]:
-        """Get any translation for a word (returns tuple of translation, lang_code)."""
-        trans = self.session.query(Translation).filter_by(word_id=word_id).first()
-        if trans and trans.language:
-            return trans.translation, trans.language.code
-        return None
 
     def update_word_stats(self, word_id: int, interval_days: int, due_date: int, ease_factor: float):
         """Update word stats."""

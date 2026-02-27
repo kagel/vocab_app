@@ -1,6 +1,6 @@
 # Vocabulary App
 
-A lightweight vocabulary learning app with system tray and spaced repetition. Supports both Linux desktop (XFCE, GNOME, etc.) with GTK.
+A lightweight vocabulary learning app with system tray and spaced repetition. Supports Linux desktop (XFCE, GNOME, etc.) with GTK.
 
 ## Features
 
@@ -10,6 +10,7 @@ A lightweight vocabulary learning app with system tray and spaced repetition. Su
 - **Auto-translation**: Automatic translation via Google Translate
 - **Stats dashboard**: See words learned, streak, reviews today
 - **Autostart**: Automatically starts on login
+- **Multiple languages**: Support for 9 target languages
 
 ## GUI App (Recommended)
 
@@ -41,10 +42,15 @@ Configure in XFCE Settings → Keyboard → Application Shortcuts:
 
 ### Settings
 
-- Review interval (30min - 8hours)
-- Target language (ru, es, fr, de, it, pt, ja, zh, ko)
-- Autostart on login
-- Custom data directory
+- **Review interval**: How often to show words (30min - 8hours)
+- **Target language**: Translation language (Russian, Spanish, French, German, Italian, Portuguese, Japanese, Chinese, Korean)
+- **Autostart**: Automatically starts on system login
+- **Custom data directory**: Store database elsewhere
+
+### Database Location
+
+- Default: `~/.local/share/vocab_app/vocab.db`
+- Can be changed in settings
 
 ## Bash Scripts (Legacy)
 
@@ -80,7 +86,15 @@ Uses the **SM-2 algorithm**:
 - **Ease factor**: Increases slightly with each review (minimum 1.3)
 - **Maximum interval**: 180 days (≈6 months)
 
-## Data Storage
+## Troubleshooting
 
-- Default: `~/.local/share/vocab_app/vocab.db`
-- Custom path can be set in settings
+### No popup appears
+- Make sure `notify-send` is installed: `sudo apt install libnotify-bin`
+- Check that desktop notifications are enabled in your system settings
+
+### Words don't appear in review
+- The app shows words that are due for review (based on interval)
+- Make sure your target language matches the translations you want to review
+
+### Icons not showing
+- If tray icon or popup icon doesn't appear, check file permissions on `icons/` folder

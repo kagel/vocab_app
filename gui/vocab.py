@@ -189,10 +189,6 @@ X-GNOME-Autostart-enabled=true
         translation = self.db.get_translation(word_id, target_lang)
         return translation, target_lang
 
-    def get_any_translation(self, word_id: int) -> tuple[Optional[str], Optional[str]]:
-        """Get any available translation for a word."""
-        return self.db.get_any_translation(word_id)
-
     def get_stats(self) -> dict:
         """Get statistics."""
         stats = self.db.get_stats()
