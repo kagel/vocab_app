@@ -146,8 +146,8 @@ X-GNOME-Autostart-enabled=true
             new_ease = max(1.3, new_ease)
 
             if due == 0 or now >= due:
-                # First review or overdue
-                new_interval = interval
+                new_interval = int(interval * new_ease * 0.5)
+                new_interval = max(1, new_interval)
             else:
                 # Normal progression
                 new_interval = int(interval * new_ease)
@@ -170,7 +170,6 @@ X-GNOME-Autostart-enabled=true
             current_interval = 1
         
         # Move due date forward by a small amount (10 minutes) to deprioritize
-        import time
         new_due = int(time.time()) + 600  # 10 minutes from now
         
         self.db.update_word_stats(word_id, current_interval, new_due, stats.get("ease_factor", 2.5) if stats else 2.5)
@@ -206,3 +205,7 @@ X-GNOME-Autostart-enabled=true
             return bool(result)
         except:
             return False
+
+    def export_csv(self, filepath: str):
+        """Export words to CSV."""
+        self.db.export_csv(filepath)

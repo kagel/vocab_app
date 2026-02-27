@@ -17,7 +17,7 @@ class SettingsWindow(Gtk.Window):
         super().__init__(title="Settings")
         self.vocab_service = vocab_service
         self.on_save = on_save
-        self.set_default_size(550, 900)
+        self.set_default_size(550, 840)
         self.set_position(Gtk.WindowPosition.CENTER)
 
         self.recording_key = None
@@ -157,7 +157,6 @@ class SettingsWindow(Gtk.Window):
 
     def on_test_api(self, widget):
         """Test translation API."""
-        settings = self.vocab_service.get_settings()
         self.vocab_service.db.set_setting("translation_provider", self.provider_combo.get_active_id())
         self.vocab_service.db.set_setting("target_lang", self.lang_combo.get_active_id())
 

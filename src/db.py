@@ -4,10 +4,11 @@
 import os
 import time
 import glob
+import csv
 from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, UniqueConstraint
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session, scoped_session
 from sqlalchemy import func, and_
 
 Base = declarative_base()
@@ -85,24 +86,32 @@ class Database:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.engine = create_engine(f'sqlite:///{db_path}', echo=False)
-        self.Session = sessionmaker(bind=self.engine, expire_on_commit=False)
-        self._session: Optional[Session] = None
+        session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
+        self.ScopedSession = scoped_session(session_factory)
 
     @property
     def session(self) -> Session:
-        if self._session is None:
-            self._session = self.Session()
-        return self._session
+        return self.ScopedSession()
+
+    def remove_session(self):
+        """Remove scoped session (call after thread completes)."""
+        self.ScopedSession.remove()
 
     def connect(self):
         """Connect to database and create schema."""
         Base.metadata.create_all(self.engine)
 
+    def _commit(self):
+        """Commit with rollback on error."""
+        try:
+            self.session.commit()
+        except Exception as e:
+            self.session.rollback()
+            raise e
+
     def close(self):
         """Close connection."""
-        if self._session:
-            self._session.close()
-            self._session = None
+        self.ScopedSession.remove()
 
     def init_schema(self):
         """Initialize database schema (alias for connect)."""
@@ -128,7 +137,7 @@ class Database:
             if not existing:
                 lang = Language(code=code, name=name, abbreviation=abbrev)
                 self.session.add(lang)
-        self.session.commit()
+        self._commit()
 
     def get_language_by_code(self, code: str) -> Optional[Language]:
         """Get language by code."""
@@ -147,7 +156,7 @@ class Database:
         
         word = Word(phrase=phrase)
         self.session.add(word)
-        self.session.commit()
+        self._commit()
         return word.id
 
     def get_word_by_phrase(self, phrase: str) -> Optional[dict]:
@@ -193,7 +202,7 @@ class Database:
             trans = Translation(word_id=word_id, translation=translation, language_id=lang.id)
             self.session.add(trans)
         
-        self.session.commit()
+        self._commit()
 
     def get_translation(self, word_id: int, target_lang: str = "ru") -> Optional[str]:
         """Get translation for a word."""
@@ -224,7 +233,7 @@ class Database:
             )
             self.session.add(stats)
         
-        self.session.commit()
+        self._commit()
 
     def get_word_stats(self, word_id: int) -> Optional[dict]:
         """Get stats for a word."""
@@ -241,34 +250,27 @@ class Database:
         }
 
     def get_due_words(self, limit: int = 20, target_lang: str = None) -> list:
-        """Get words that are due for review, optionally filtered by translation language."""
+        """Get words that are due for review, filtered and sorted in SQL."""
         now = int(time.time())
+        
+        query = self.session.query(Word).outerjoin(WordStats)
         
         if target_lang:
             lang = self.get_language_by_code(target_lang)
             if lang:
-                words = self.session.query(Word).outerjoin(WordStats).outerjoin(
+                query = query.outerjoin(
                     Translation, (Word.id == Translation.word_id) & (Translation.language_id == lang.id)
-                ).filter(Translation.id != None).all()
+                ).filter(Translation.id != None)
             else:
-                words = []
-        else:
-            words = self.session.query(Word).outerjoin(WordStats).all()
+                return []
+        
+        words = query.order_by(
+            func.coalesce(WordStats.due_date, 0).asc(),
+            func.coalesce(WordStats.interval_days, 1).asc()
+        ).limit(limit).all()
         
         results = []
-        
         for word in words:
-            urgency = 100
-            if word.stats:
-                if word.stats.due_date and word.stats.due_date <= now:
-                    urgency = 100
-                elif word.stats.due_date and word.stats.due_date > now:
-                    urgency = 10
-                else:
-                    urgency = 100 + (word.stats.due_date - now) / 3600 if word.stats.due_date else 100
-            else:
-                urgency = 100
-            
             result = {
                 "id": word.id,
                 "phrase": word.phrase,
@@ -276,12 +278,11 @@ class Database:
                 "interval_days": word.stats.interval_days if word.stats else 1,
                 "due_date": word.stats.due_date if word.stats else now,
                 "ease_factor": word.stats.ease_factor if word.stats else 2.5,
-                "urgency": urgency
+                "urgency": 100
             }
             results.append(result)
         
-        results.sort(key=lambda x: x["urgency"], reverse=True)
-        return results[:limit]
+        return results
 
     def get_all_words(self) -> list:
         """Get all words with stats."""
@@ -308,20 +309,24 @@ class Database:
         word = self.session.query(Word).filter_by(phrase=phrase.lower()).first()
         if word:
             self.session.delete(word)
-            self.session.commit()
+            self._commit()
 
     def record_review(self, word_id: int):
         """Record a review in history."""
         history = History(word_id=word_id)
         self.session.add(history)
-        self.session.commit()
+        self._commit()
 
     def get_stats(self) -> dict:
         """Get overall statistics."""
         now = int(time.time())
-        today_start = now - (now % 86400)
+        today_start = int(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
 
         total = self.session.query(func.count(Word.id)).scalar() or 0
+
+        today_words = self.session.query(func.count(Word.id)).filter(
+            Word.created_at >= today_start
+        ).scalar() or 0
 
         today_reviews = self.session.query(func.count(History.id)).filter(
             History.reviewed_at >= today_start
@@ -343,6 +348,7 @@ class Database:
 
         return {
             "total_words": total,
+            "today_words": today_words,
             "today_reviews": today_reviews,
             "total_reviews": total_reviews,
             "due_count": due_count,
@@ -363,11 +369,10 @@ class Database:
         else:
             setting = Setting(key=key, value=value)
             self.session.add(setting)
-        self.session.commit()
+        self._commit()
 
     def export_csv(self, filepath: str):
         """Export words to CSV."""
-        import csv
         words = self.get_all_words()
         with open(filepath, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
@@ -382,29 +387,27 @@ class Database:
 
     def get_streak(self) -> int:
         """Calculate current streak (consecutive days with reviews)."""
-        rows = self.session.query(History.reviewed_at).distinct().all()
-
+        rows = self.session.query(
+            func.date(History.reviewed_at, 'unixepoch').label('day')
+        ).distinct().order_by(
+            func.date(History.reviewed_at, 'unixepoch').desc()
+        ).all()
+        
         if not rows:
             return 0
-
-        import datetime
-        days = set()
-        for row in rows:
-            dt = datetime.datetime.fromtimestamp(row.reviewed_at)
-            days.add(dt.strftime("%Y-%m-%d"))
-
-        days = sorted(days, reverse=True)
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        
+        days = [row[0] for row in rows]
+        today = datetime.now().strftime("%Y-%m-%d")
         streak = 0
         expected_date = today
-
+        
         for day in days:
             if day == expected_date:
                 streak += 1
-                d = datetime.datetime.strptime(expected_date, "%Y-%m-%d")
-                d -= datetime.timedelta(days=1)
+                d = datetime.strptime(expected_date, "%Y-%m-%d")
+                d -= timedelta(days=1)
                 expected_date = d.strftime("%Y-%m-%d")
             elif day < expected_date:
                 break
-
+        
         return streak

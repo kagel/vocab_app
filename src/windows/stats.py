@@ -39,6 +39,10 @@ class StatsWindow(Gtk.Window):
         row = self._make_row("Total words:", str(stats.get("total_words", 0)))
         box.pack_start(row, False, False, 0)
 
+        # Added today
+        row = self._make_row("Added today:", str(stats.get("today_words", 0)))
+        box.pack_start(row, False, False, 0)
+
         # Reviews today
         row = self._make_row("Reviews today:", str(stats.get("today_reviews", 0)))
         box.pack_start(row, False, False, 0)
@@ -110,7 +114,7 @@ class StatsWindow(Gtk.Window):
 
         if dialog.run() == Gtk.ResponseType.OK:
             try:
-                self.vocab_service.db.export_csv(dialog.get_filename())
+                self.vocab_service.export_csv(dialog.get_filename())
                 msg = Gtk.MessageDialog(
                     self,
                     Gtk.DialogFlags.DESTROY_WITH_PARENT,
@@ -135,4 +139,7 @@ class StatsWindow(Gtk.Window):
 
     def refresh(self):
         """Refresh stats."""
+        child = self.get_child()
+        if child:
+            self.remove(child)
         self.build_ui()
