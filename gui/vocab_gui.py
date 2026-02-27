@@ -22,7 +22,7 @@ from windows.add_word import AddWordDialog
 # Module-level icon path for CLI
 ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icons", "translate.svg")
 
-def notify_cli(body, title=""):
+def notify_cli(body, title="Vocab"):
     """Send notification from CLI (without self)."""
     icon_arg = f'-i "{ICON_PATH}"' if os.path.exists(ICON_PATH) else ""
     cmd = f'dbus-launch notify-send {icon_arg} -u low "{title}" "{body}"'
