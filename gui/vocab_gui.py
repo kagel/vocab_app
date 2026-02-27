@@ -69,7 +69,7 @@ class VocabTrayApp:
         self.review_thread = threading.Thread(target=self.review_loop, daemon=True)
         self.review_thread.start()
 
-    def notify(self, body, title=""):
+    def notify(self, body, title="Vocab"):
         """Send notification with icon."""
         notify_cli(body, title)
 
