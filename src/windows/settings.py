@@ -94,7 +94,7 @@ class SettingsWindow(Gtk.Window):
         box.pack_start(section, False, False, 0)
 
         # Info label
-        info_label = Gtk.Label("Hotkeys work best when configured in XFCE:\nSettings → Keyboard → Application Shortcuts.\n\nCommands:")
+        info_label = Gtk.Label("Configure hotkeys in your desktop environment:\n(Usually Settings → Keyboard → Shortcuts)\n\nCommands:")
         info_label.set_xalign(0)
         info_label.set_line_wrap(True)
         box.pack_start(info_label, False, False, 0)

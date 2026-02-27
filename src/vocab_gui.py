@@ -7,6 +7,7 @@ import threading
 import time
 import subprocess
 import argparse
+import pyperclip
 
 from db import Database
 from vocab import VocabService
@@ -16,16 +17,15 @@ from vocab import VocabService
 ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icons", "translate.svg")
 
 def notify_cli(body, title="Vocab"):
-    """Send notification from CLI (without self)."""
+    """Send notification - uses libnotify via subprocess (works on most Linux desktops)."""
     args = ["notify-send", "-u", "low", title, body]
     if os.path.exists(ICON_PATH):
-        args.insert(1, "-i")
-        args.insert(2, ICON_PATH)
+        args[1:1] = ["-i", ICON_PATH]
     subprocess.run(args, check=False)
 
 
 def run_cli():
-    """Handle CLI actions (for XFCE hotkeys)."""
+    """Handle CLI actions (for desktop hotkeys)."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--save", action="store_true", help="Save word from selection")
     parser.add_argument("--delete", action="store_true", help="Delete current word")
@@ -64,11 +64,7 @@ def run_cli():
 
     if args.save:
         try:
-            result = os.popen("xclip -o -selection primary 2>/dev/null").read().strip()
-            if not result:
-                result = os.popen("xclip -o -selection clipboard 2>/dev/null").read().strip()
-            if not result and os.environ.get("WAYLAND_DISPLAY"):
-                result = os.popen("wl-paste 2>/dev/null").read().strip()
+            result = pyperclip.paste().strip()
             
             if result:
                 phrase = result.lower().strip()

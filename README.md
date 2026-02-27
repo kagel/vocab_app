@@ -46,9 +46,9 @@ source venv/bin/activate
 python3 src/vocab_gui.py
 ```
 
-### Keyboard Shortcuts (XFCE)
+### Keyboard Shortcuts
 
-Configure in XFCE Settings → Keyboard → Application Shortcuts:
+Configure in your desktop environment settings (usually Settings → Keyboard → Shortcuts):
 
 | Command | Purpose |
 |---------|---------|
