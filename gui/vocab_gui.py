@@ -56,10 +56,11 @@ class VocabTrayApp:
         self.paused_until = 0
         self.running = True
 
-        # Create indicator
+        # Create indicator with custom icon
+        tray_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons", "tray.svg")
         self.indicator = AppIndicator3.Indicator.new(
             "vocab-app",
-            "dialog-information",
+            tray_icon_path if os.path.exists(tray_icon_path) else "dialog-information",
             AppIndicator3.IndicatorCategory.SYSTEM_SERVICES
         )
         self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
