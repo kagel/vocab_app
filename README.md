@@ -12,6 +12,20 @@ A lightweight vocabulary learning app with system tray and spaced repetition. Su
 - **Autostart**: Automatically starts on login
 - **Multiple languages**: Support for 9 target languages
 
+## Screenshots
+
+### Popup Notification
+![Popup](docs/screenshot-popup.png)
+
+### Add Word Dialog
+![Add Word](docs/screenshot-add-word.png)
+
+### Settings Window
+![Settings](docs/screenshot-settings.png)
+
+### Statistics Window
+![Stats](docs/screenshot-stats.png)
+
 ## GUI App (Recommended)
 
 Located in `src/` folder - modern GTK3 interface with system tray.
@@ -50,31 +64,6 @@ Configure in XFCE Settings → Keyboard → Application Shortcuts:
 
 - Default: `~/.local/share/vocab_app/vocab.db`
 - Can be changed in settings
-
-## Bash Scripts (Legacy)
-
-Original bash-based version in project root.
-
-| Script | Purpose |
-|--------|---------|
-| `vocab_save.sh` | Save selected text to vocabulary |
-| `vocab_show.sh` | Continuous popup loop with translations |
-| `vocab_discard.sh` | Remove current phrase |
-| `vocab_stats.sh` | Display learning statistics |
-| `vocab_config.sh` | Shared configuration |
-
-### Dependencies (Bash)
-
-```bash
-# Core
-sudo apt install curl notify-send
-
-# X11
-sudo apt install xclip
-
-# Wayland
-sudo apt install wl-clipboard
-```
 
 ## Spaced Repetition
 
