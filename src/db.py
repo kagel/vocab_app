@@ -5,7 +5,7 @@ import os
 import time
 import glob
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session, scoped_session
@@ -319,8 +319,10 @@ class Database:
 
     def get_stats(self) -> dict:
         """Get overall statistics."""
-        now = int(time.time())
-        today_start = int(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+
+        # Use UTC for today
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        today_start = int(datetime(now.year, now.month, now.day).timestamp())
 
         total = self.session.query(func.count(Word.id)).scalar() or 0
 
@@ -397,7 +399,7 @@ class Database:
             return 0
         
         days = [row[0] for row in rows]
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m-%d")
         streak = 0
         expected_date = today
         
