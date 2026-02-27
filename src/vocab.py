@@ -20,7 +20,6 @@ class VocabService:
             "review_interval": int(self.db.get_setting("review_interval", "3600")),
             "target_lang": self.db.get_setting("target_lang", "ru"),
             "translation_provider": self.db.get_setting("translation_provider", "google"),
-            "data_dir": self.db.get_setting("data_dir", ""),
         }
 
     def get_languages(self) -> list:

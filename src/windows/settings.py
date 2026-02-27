@@ -8,15 +8,17 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
 from translate import ProviderRegistry
+from config import read_config, write_config
 
 
 class SettingsWindow(Gtk.Window):
     """Settings window."""
 
-    def __init__(self, vocab_service, on_save=None):
+    def __init__(self, vocab_service, on_save=None, config_file=None):
         super().__init__(title="Settings")
         self.vocab_service = vocab_service
         self.on_save = on_save
+        self.config_file = config_file
         self.set_default_size(550, 840)
         self.set_position(Gtk.WindowPosition.CENTER)
 
@@ -127,11 +129,16 @@ class SettingsWindow(Gtk.Window):
         hint_label.set_line_wrap(True)
         box.pack_start(hint_label, False, False, 0)
 
-        data_dir = self.vocab_service.get_settings().get("data_dir", "")
+        # Custom data directory (read from config file)
         dir_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         dir_box.pack_start(Gtk.Label("Custom Path:"), False, False, 0)
+        
+        # Read from config file if available (JSON)
+        config = read_config(self.config_file) if self.config_file else {}
+        custom_data_dir = config.get("data_dir", "")
+        
         self.data_dir_entry = Gtk.Entry()
-        self.data_dir_entry.set_text(data_dir)
+        self.data_dir_entry.set_text(custom_data_dir)
         dir_box.pack_end(self.data_dir_entry, True, True, 0)
         box.pack_start(dir_box, False, False, 0)
 
@@ -179,8 +186,14 @@ class SettingsWindow(Gtk.Window):
             "translation_provider": self.provider_combo.get_active_id(),
             "target_lang": self.lang_combo.get_active_id(),
             "autostart": "true" if self.autostart_check.get_active() else "false",
-            "data_dir": self.data_dir_entry.get_text(),
         }
+        
+        # Save data_dir to config file instead of DB
+        new_data_dir = self.data_dir_entry.get_text().strip()
+        if self.config_file:
+            config = read_config(self.config_file)
+            config["data_dir"] = new_data_dir
+            write_config(self.config_file, config)
 
         self.vocab_service.save_settings(settings)
 

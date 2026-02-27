@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 """Main vocab GUI application with system tray."""
 
+import argparse
 import os
+import subprocess
 import sys
 import threading
 import time
-import subprocess
-import argparse
+
 import pyperclip
 
+from config import read_config
 from db import Database
 from vocab import VocabService
 
-
 # Module-level icon path for CLI
 ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icons", "translate.svg")
+
 
 def notify_cli(body, title="Vocab"):
     """Send notification - uses libnotify via subprocess (works on most Linux desktops)."""
@@ -73,26 +75,25 @@ def run_cli():
         print("Please run the GUI app first to initialize the database.")
         sys.exit(1)
     
+    # Check config file for custom data_dir (JSON)
+    config_file = os.path.expanduser("~/.config/vocab_app/settings")
+    config = read_config(config_file)
+    custom_data_dir = config.get("data_dir")
+    
+    if custom_data_dir:
+        expanded = os.path.expanduser(custom_data_dir)
+        if os.path.exists(os.path.join(expanded, "vocab.db")):
+            db_path = os.path.join(expanded, "vocab.db")
+    
     db = Database(db_path)
     db.connect()
     db.init_languages()
-    
-    saved_data_dir = db.get_setting("data_dir")
-    if saved_data_dir:
-        expanded = os.path.expanduser(saved_data_dir)
-        if os.path.exists(os.path.join(expanded, "vocab.db")):
-            db_path = os.path.join(expanded, "vocab.db")
-            db.close()
-            db = Database(db_path)
-            db.connect()
     
     vocab_service = VocabService(db)
     
     def get_lang_abbrev(code):
         lang = db.get_language_by_code(code)
         return lang.abbreviation if lang else code.upper()
-    
-    target_lang = db.get_setting("target_lang", "ru") or "ru"
 
     if args.save:
         try:
@@ -188,16 +189,36 @@ class VocabTrayApp:
         return "unknown"
 
     def __init__(self):
-        # Initialize database
-        self.data_dir = self.DEFAULT_DATA_DIR
+        # Config file path
+        config_dir = os.path.expanduser("~/.config/vocab_app")
+        self.config_file = os.path.join(config_dir, "settings")
+        
+        # Read custom data_dir from config file (JSON)
+        custom_data_dir = None
+        config = read_config(self.config_file)
+        custom_data_dir = config.get("data_dir")
+        
+        # Determine DB path
+        default_db_path = os.path.join(self.DEFAULT_DATA_DIR, "vocab.db")
+        
+        if custom_data_dir:
+            custom_db_path = os.path.join(os.path.expanduser(custom_data_dir), "vocab.db")
+            if os.path.exists(custom_db_path):
+                db_path = custom_db_path
+            else:
+                db_path = default_db_path
+        else:
+            db_path = default_db_path
+        
+        # Initialize DB with the decided path
+        self.data_dir = os.path.dirname(db_path)
         os.makedirs(self.data_dir, exist_ok=True)
-        db_path = os.path.join(self.data_dir, "vocab.db")
-
+        
         self.db = Database(db_path)
         self.db.connect()
         self.db.init_schema()
-
-        # Set default settings if not set
+        
+        # Set default settings if not set (without data_dir - now in config file)
         self._init_default_settings()
 
         # Initialize services
@@ -240,7 +261,6 @@ class VocabTrayApp:
             "target_lang": "ru",
             "translation_provider": "google",
             "autostart": "false",
-            "data_dir": "",
         }
         for key, value in defaults.items():
             if self.db.get_setting(key) is None:
@@ -254,11 +274,6 @@ class VocabTrayApp:
         next_item = Gtk.MenuItem(label="Show next word")
         next_item.connect("activate", self.on_show_next)
         menu.append(next_item)
-
-        # Today's stats
-        stats_item = Gtk.MenuItem(label="Stats")
-        stats_item.connect("activate", self.on_show_stats)
-        menu.append(stats_item)
 
         # Add word
         add_item = Gtk.MenuItem(label="Add word")
@@ -276,6 +291,11 @@ class VocabTrayApp:
         settings_item = Gtk.MenuItem(label="Settings")
         settings_item.connect("activate", self.on_settings)
         menu.append(settings_item)
+
+        # Stats
+        stats_item = Gtk.MenuItem(label="Stats")
+        stats_item.connect("activate", self.on_show_stats)
+        menu.append(stats_item)
 
         menu.append(Gtk.SeparatorMenuItem())
 
@@ -412,7 +432,7 @@ class VocabTrayApp:
 
     def on_settings(self, widget):
         """Show settings window."""
-        win = SettingsWindow(self.vocab_service)
+        win = SettingsWindow(self.vocab_service, config_file=self.config_file)
         win.show_all()
 
     def on_quit(self, widget):
