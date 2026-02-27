@@ -142,6 +142,19 @@ class VocabTrayApp:
     # Default data directory
     DEFAULT_DATA_DIR = os.path.expanduser("~/.local/share/vocab_app")
 
+    def _get_desktop_environment(self) -> str:
+        """Detect desktop environment."""
+        xdg_current_desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+        if "gnome" in xdg_current_desktop:
+            return "gnome"
+        if "kde" in xdg_current_desktop or "plasma" in xdg_current_desktop:
+            return "kde"
+        if "xfce" in xdg_current_desktop:
+            return "xfce"
+        if "ubuntu" in xdg_current_desktop:
+            return "ubuntu"
+        return "unknown"
+
     def __init__(self):
         # Initialize database
         self.data_dir = self.DEFAULT_DATA_DIR
@@ -178,6 +191,12 @@ class VocabTrayApp:
         self.review_thread = threading.Thread(target=self.review_loop, daemon=True)
         self.review_thread.start()
 
+        # GNOME tray warning (one-time)
+        if self._get_desktop_environment() in ("gnome", "ubuntu"):
+            if not self.db.get_setting("gnome_tray_warning_shown"):
+                self.notify("GNOME detected. If tray icon is missing, install 'Top Icons' or 'Tray Icons' extension.", "Vocab")
+                self.db.set_setting("gnome_tray_warning_shown", "true")
+
     def notify(self, body, title="Vocab"):
         """Send notification with icon."""
         notify_cli(body, title)
@@ -200,7 +219,7 @@ class VocabTrayApp:
         menu = Gtk.Menu()
 
         # Show next word
-        next_item = Gtk.MenuItem(label="Show Next Word")
+        next_item = Gtk.MenuItem(label="Show next word")
         next_item.connect("activate", self.on_show_next)
         menu.append(next_item)
 
@@ -210,7 +229,7 @@ class VocabTrayApp:
         menu.append(stats_item)
 
         # Add word
-        add_item = Gtk.MenuItem(label="Add Word")
+        add_item = Gtk.MenuItem(label="Add word")
         add_item.connect("activate", self.on_add_word)
         menu.append(add_item)
 
