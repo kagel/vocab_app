@@ -24,6 +24,36 @@ def notify_cli(body, title="Vocab"):
     subprocess.run(args, check=False)
 
 
+def get_clipboard_text() -> str:
+    """Get text from primary selection (highlighted text) or clipboard."""
+    # Primary selection first - what user just highlighted/selected
+    try:
+        result = os.popen("xclip -o -selection primary 2>/dev/null").read().strip()
+        if result:
+            return result
+    except Exception:
+        pass
+    
+    # Wayland primary selection
+    if os.environ.get("WAYLAND_DISPLAY"):
+        try:
+            result = os.popen("wl-paste -p 2>/dev/null").read().strip()
+            if result:
+                return result
+        except Exception:
+            pass
+    
+    # Fallback: clipboard (what user explicitly copied)
+    try:
+        result = pyperclip.paste()
+        if result:
+            return result
+    except Exception:
+        pass
+    
+    return ""
+
+
 def run_cli():
     """Handle CLI actions (for desktop hotkeys)."""
     parser = argparse.ArgumentParser()
@@ -61,13 +91,16 @@ def run_cli():
     def get_lang_abbrev(code):
         lang = db.get_language_by_code(code)
         return lang.abbreviation if lang else code.upper()
+    
+    target_lang = db.get_setting("target_lang", "ru") or "ru"
 
     if args.save:
         try:
-            result = pyperclip.paste().strip()
-            
-            if result:
-                phrase = result.lower().strip()
+            result = get_clipboard_text()
+            if not result:
+                notify_cli("No text selected")
+            else:
+                phrase = result.strip().lower()
                 if len(phrase) >= 1:
                     success = vocab_service.add_word(phrase)
                     if not success:
@@ -92,8 +125,6 @@ def run_cli():
                             notify_cli(f"Word saved: {phrase[:30]}")
                 else:
                     notify_cli("Word too short (min 1 char)")
-            else:
-                notify_cli("No text selected")
         except Exception as e:
             notify_cli(f"Error: {e}")
     
@@ -125,6 +156,7 @@ def run_cli():
     
     db.close()
     return True
+
 
 import gi
 gi.require_version('Gtk', '3.0')
