@@ -6,3 +6,25 @@ saved_phrases.txt
 *.swo
 
 .idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+/tmp/
+*.log
