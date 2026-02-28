@@ -5,7 +5,7 @@ import os
 import time
 from typing import Optional
 from db import Database
-from translate import ProviderRegistry
+from translation import ProviderRegistry
 
 
 class VocabService:
@@ -19,7 +19,7 @@ class VocabService:
         return {
             "review_interval": int(self.db.get_setting("review_interval", "3600")),
             "target_lang": self.db.get_setting("target_lang", "ru"),
-            "translation_provider": self.db.get_setting("translation_provider", "google"),
+            "translation_provider": self.db.get_setting("translation_provider", "google_direct"),
         }
 
     def get_languages(self) -> list:
@@ -95,9 +95,8 @@ X-GNOME-Autostart-enabled=true
             if translation:
                 self.db.add_translation(existing["id"], translation, target_lang)
             elif auto_translate:
-                provider = ProviderRegistry.get(
-                    self.db.get_setting("translation_provider", "google") or "google"
-                )
+                provider_name = self.db.get_setting("translation_provider", "google_direct") or "google_direct"
+                provider = ProviderRegistry.get(provider_name)
                 trans = provider.translate(phrase, target_lang)
                 if trans:
                     self.db.add_translation(existing["id"], trans, target_lang)
@@ -110,9 +109,8 @@ X-GNOME-Autostart-enabled=true
             target_lang = self.db.get_setting("target_lang", "ru") or "ru"
             self.db.add_translation(word_id, translation, target_lang)
         elif auto_translate:
-            provider = ProviderRegistry.get(
-                self.db.get_setting("translation_provider", "google") or "google"
-            )
+            provider_name = self.db.get_setting("translation_provider", "google_direct") or "google_direct"
+            provider = ProviderRegistry.get(provider_name)
             target_lang = self.db.get_setting("target_lang", "ru") or "ru"
             trans = provider.translate(phrase, target_lang)
             if trans:
@@ -213,9 +211,8 @@ X-GNOME-Autostart-enabled=true
     def test_translation_api(self) -> bool:
         """Test if translation API works."""
         try:
-            provider = ProviderRegistry.get(
-                self.db.get_setting("translation_provider", "google")
-            )
+            provider_name = self.db.get_setting("translation_provider", "google_direct")
+            provider = ProviderRegistry.get(provider_name)
             result = provider.translate("hello", self.db.get_setting("target_lang", "ru"))
             return bool(result)
         except:

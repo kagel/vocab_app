@@ -7,7 +7,8 @@ A lightweight vocabulary learning app with system tray and spaced repetition. Su
 - **System tray**: Runs in background with tray icon
 - **Save phrases**: Select text anywhere, press a hotkey, done
 - **Spaced repetition**: SM-2 algorithm for optimal review scheduling
-- **Auto-translation**: Automatic translation via Google Translate
+- **Auto-translation**: Automatic translation via multiple providers
+- **Multiple translation providers**: Google (direct), Google (deep-translator), EasyGoogle, MyMemory
 - **Stats dashboard**: See words learned, streak, reviews today
 - **Autostart**: Automatically starts on login
 - **Multiple languages**: Support for 9 target languages
@@ -39,6 +40,12 @@ Located in `src/` folder - modern GTK3 interface with system tray.
 ./setup.sh
 ```
 
+This will create a virtual environment and install dependencies:
+- `requests` - HTTP library
+- `sqlalchemy` - Database ORM
+- `deep-translator` - Translation library
+- `easygoogletranslate` - Alternative translation
+
 ### Running
 
 ```bash
@@ -59,6 +66,7 @@ Configure in your desktop environment settings (usually Settings â†’ Keyboard â†
 ### Settings
 
 - **Review interval**: How often to show words (30min - 8hours)
+- **Translation provider**: Choose between Google Translate (direct), Google Translate (deep-translator), EasyGoogle Translate, or MyMemory (free)
 - **Target language**: Translation language (Russian, Spanish, French, German, Italian, Portuguese, Japanese, Chinese, Korean)
 - **Autostart**: Automatically starts on system login
 - **Custom data directory**: Store database elsewhere

@@ -5,9 +5,9 @@ import os
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
+from gi.repository import Gtk, GLib
 
-from translate import ProviderRegistry
+from translation import ProviderRegistry
 from config import read_config, write_config
 
 
@@ -70,7 +70,14 @@ class SettingsWindow(Gtk.Window):
         self.provider_combo = Gtk.ComboBoxText()
         for provider, name in ProviderRegistry.list_providers():
             self.provider_combo.append(provider, name)
-        current_provider = self.vocab_service.get_settings().get("translation_provider", "google")
+        
+        # Handle legacy "google" setting and default
+        current_provider = self.vocab_service.get_settings().get("translation_provider", "google_direct")
+        if current_provider == "google":
+            current_provider = "google_direct"  # Legacy fallback
+        if current_provider not in [p[0] for p in ProviderRegistry.list_providers()]:
+            current_provider = "google_direct"  # Default if not found
+        
         self.provider_combo.set_active_id(current_provider)
         provider_box.pack_end(self.provider_combo, False, False, 0)
         box.pack_start(provider_box, False, False, 0)
@@ -87,9 +94,23 @@ class SettingsWindow(Gtk.Window):
         box.pack_start(lang_box, False, False, 0)
 
         # Test API button
+        test_btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         test_btn = Gtk.Button(label="Test API")
         test_btn.connect("clicked", self.on_test_api)
-        box.pack_start(test_btn, False, False, 0)
+        test_btn_box.pack_start(test_btn, False, False, 0)
+        
+        self.test_spinner = Gtk.Spinner()
+        self.test_spinner.set_size_request(20, 20)
+        self.test_spinner.hide()
+        test_btn_box.pack_start(self.test_spinner, False, False, 0)
+        
+        self.test_status_label = Gtk.Label("")
+        self.test_status_label.set_xalign(0)
+        self.test_status_label.set_line_wrap(True)
+        self.test_status_label.hide()
+        test_btn_box.pack_start(self.test_status_label, True, True, 0)
+        
+        box.pack_start(test_btn_box, False, False, 0)
 
         # Keyboard shortcuts
         section = self._make_section("KEYBOARD SHORTCUTS")
@@ -164,20 +185,41 @@ class SettingsWindow(Gtk.Window):
 
     def on_test_api(self, widget):
         """Test translation API."""
-        self.vocab_service.set_setting("translation_provider", self.provider_combo.get_active_id())
-        self.vocab_service.set_setting("target_lang", self.lang_combo.get_active_id())
+        provider = self.provider_combo.get_active_id()
+        target_lang = self.lang_combo.get_active_id()
+        
+        self.vocab_service.set_setting("translation_provider", provider)
+        self.vocab_service.set_setting("target_lang", target_lang)
+        
+        provider_name = ProviderRegistry.get(provider).get_name()
+        self.test_status_label.set_text(f"Testing {provider_name}...")
+        self.test_spinner.show()
+        self.test_spinner.start()
+        
+        def run_test():
+            success = self.vocab_service.test_translation_api()
+            GLib.idle_add(self._test_complete, success, provider_name)
 
-        success = self.vocab_service.test_translation_api()
+        import threading
+        thread = threading.Thread(target=run_test)
+        thread.daemon = True
+        thread.start()
 
-        msg = Gtk.MessageDialog(
-            self,
-            Gtk.DialogFlags.DESTROY_WITH_PARENT,
-            Gtk.MessageType.INFO if success else Gtk.MessageType.ERROR,
-            Gtk.ButtonsType.OK,
-            "API Test Successful!" if success else "API Test Failed!"
-        )
-        msg.run()
-        msg.destroy()
+    def _test_complete(self, success, provider_name):
+        """Handle test completion."""
+        self.test_spinner.stop()
+        self.test_spinner.hide()
+        
+        status = "Success!" if success else "Failed!"
+        detail = "works." if success else "not working."
+        self.test_status_label.set_text(f"{status} {provider_name} {detail}")
+        
+        GLib.timeout_add(3000, self._clear_test_status)
+
+    def _clear_test_status(self):
+        """Clear the test status after a delay."""
+        self.test_status_label.set_text("")
+        return False
 
     def on_save_settings(self, widget):
         """Save settings."""
