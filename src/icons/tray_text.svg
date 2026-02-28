@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 64 64">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="30" fill="#4A90D9"/>
+  
+  <!-- Letter A -->
+  <text x="32" y="42" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="white" text-anchor="middle">Aa</text>
+</svg>

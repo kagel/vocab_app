@@ -79,7 +79,7 @@ class VocabTrayApp:
         self.settings_changed = threading.Event()
 
         # Create indicator with custom icon
-        tray_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons", "tray.svg")
+        tray_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons", "tray_text.svg")
         self.indicator = AppIndicator3.Indicator.new(
             "vocab-app",
             tray_icon_path if os.path.exists(tray_icon_path) else "dialog-information",
