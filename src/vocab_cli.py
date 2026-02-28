@@ -62,25 +62,14 @@ def run_cli():
             else:
                 phrase = result.strip().lower()
                 if len(phrase) >= 1:
-                    success = vocab_service.add_word(phrase)
-                    if not success:
-                        word = vocab_service.db.get_word_by_phrase(phrase)
-                        if word:
-                            translation, trans_lang = vocab_service.get_translation_with_lang(word["id"])
-                            if translation:
-                                abbrev = get_lang_abbrev(trans_lang) if trans_lang else "—"
-                                notify_cli(f"<b>{phrase[:20]}</b> → {translation} [{abbrev}]")
-                            else:
-                                notify_cli(f"Already saved: {phrase[:30]}")
-                    else:
-                        word = vocab_service.db.get_word_by_phrase(phrase)
-                        if word:
-                            translation, trans_lang = vocab_service.get_translation_with_lang(word["id"])
-                            if translation:
-                                abbrev = get_lang_abbrev(trans_lang) if trans_lang else "—"
-                                notify_cli(f"<b>{phrase[:20]}</b> → {translation} [{abbrev}]")
-                            else:
-                                notify_cli(f"Word saved: {phrase[:30]}")
+                    word = vocab_service.add_word(phrase, auto_translate=True)
+                    
+                    # Show result
+                    if word:
+                        translation, trans_lang = vocab_service.get_translation_with_lang(word["id"])
+                        if translation:
+                            abbrev = get_lang_abbrev(trans_lang) if trans_lang else "—"
+                            notify_cli(f"<b>{phrase[:20]}</b> → {translation} [{abbrev}]")
                         else:
                             notify_cli(f"Word saved: {phrase[:30]}")
                 else:

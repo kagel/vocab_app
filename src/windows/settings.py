@@ -164,8 +164,8 @@ class SettingsWindow(Gtk.Window):
 
     def on_test_api(self, widget):
         """Test translation API."""
-        self.vocab_service.db.set_setting("translation_provider", self.provider_combo.get_active_id())
-        self.vocab_service.db.set_setting("target_lang", self.lang_combo.get_active_id())
+        self.vocab_service.set_setting("translation_provider", self.provider_combo.get_active_id())
+        self.vocab_service.set_setting("target_lang", self.lang_combo.get_active_id())
 
         success = self.vocab_service.test_translation_api()
 

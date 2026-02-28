@@ -78,28 +78,17 @@ class AddWordDialog(Gtk.Window):
         box.pack_start(btn_box, False, False, 10)
 
     def on_add_clicked(self, widget):
-        """Add word without translation."""
+        """Add word with manual translation (no auto-translate)."""
         word = self.word_entry.get_text().strip()
         if not word:
             return
 
         translation = self.translation_entry.get_text().strip() or None
-        success = self.vocab_service.add_word(word, translation)
+        self.vocab_service.add_word(word, translation, auto_translate=False)
 
-        if success:
-            if self.on_add:
-                self.on_add(word)
-            self.destroy()
-        else:
-            msg = Gtk.MessageDialog(
-                self,
-                Gtk.DialogFlags.DESTROY_WITH_PARENT,
-                Gtk.MessageType.WARNING,
-                Gtk.ButtonsType.OK,
-                "Word already exists!"
-            )
-            msg.run()
-            msg.destroy()
+        if self.on_add:
+            self.on_add(word)
+        self.destroy()
 
     def on_add_translate(self, widget):
         """Add word and auto-translate."""
@@ -107,20 +96,8 @@ class AddWordDialog(Gtk.Window):
         if not word:
             return
 
-        # Force auto-translate by passing empty translation
-        success = self.vocab_service.add_word(word, None)
+        self.vocab_service.add_word(word, None, auto_translate=True)
 
-        if success:
-            if self.on_add:
-                self.on_add(word)
-            self.destroy()
-        else:
-            msg = Gtk.MessageDialog(
-                self,
-                Gtk.DialogFlags.DESTROY_WITH_PARENT,
-                Gtk.MessageType.WARNING,
-                Gtk.ButtonsType.OK,
-                "Word already exists!"
-            )
-            msg.run()
-            msg.destroy()
+        if self.on_add:
+            self.on_add(word)
+        self.destroy()

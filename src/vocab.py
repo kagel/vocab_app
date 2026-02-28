@@ -29,10 +29,18 @@ class VocabService:
     def save_settings(self, settings: dict):
         """Save app settings."""
         for key, value in settings.items():
-            self.db.set_setting(key, str(value))
+            self.set_setting(key, str(value))
         
         if "autostart" in settings:
             self._set_autostart(settings["autostart"] == "true")
+
+    def set_setting(self, key: str, value: str):
+        """Set a single setting."""
+        self.db.set_setting(key, value)
+
+    def get_setting(self, key: str, default: str = None) -> str:
+        """Get a single setting."""
+        return self.db.get_setting(key, default)
 
     def _set_autostart(self, enable: bool):
         """Enable or disable autostart."""
@@ -65,44 +73,52 @@ X-GNOME-Autostart-enabled=true
             if os.path.exists(desktop_file):
                 os.remove(desktop_file)
 
-    def add_word(self, phrase: str, translation: str = None) -> bool:
-        """Add a new word or add translation to existing word."""
+    def add_word(self, phrase: str, translation: str = None, auto_translate: bool = False) -> dict:
+        """Add a new word or add translation to existing word.
+        
+        Args:
+            phrase: The word/phrase to add
+            translation: Optional manual translation
+            auto_translate: If True, auto-translate when no translation provided
+            
+        Returns:
+            dict with word info (id, phrase)
+        """
         phrase = phrase.strip().lower()
 
         existing = self.db.get_word_by_phrase(phrase)
         
-        if existing and translation:
-            # Word exists, but we're adding translation for a different language
-            target_lang = self.db.get_setting("target_lang", "ru") or "ru"
-            self.db.add_translation(existing["id"], translation, target_lang)
-            return True
-        
         if existing:
-            # Word exists - try to auto-translate for current target language
-            provider = ProviderRegistry.get(
-                self.db.get_setting("translation_provider", "google") or "google"
-            )
+            # Word exists - add/update translation if provided or auto_translate
             target_lang = self.db.get_setting("target_lang", "ru") or "ru"
-            translation = provider.translate(phrase, target_lang)
+            
             if translation:
                 self.db.add_translation(existing["id"], translation, target_lang)
-            return False  # Word already existed
-
+            elif auto_translate:
+                provider = ProviderRegistry.get(
+                    self.db.get_setting("translation_provider", "google") or "google"
+                )
+                trans = provider.translate(phrase, target_lang)
+                if trans:
+                    self.db.add_translation(existing["id"], trans, target_lang)
+            return existing
+        
+        # New word
         word_id = self.db.add_word(phrase)
 
         if translation:
             target_lang = self.db.get_setting("target_lang", "ru") or "ru"
             self.db.add_translation(word_id, translation, target_lang)
-        else:
+        elif auto_translate:
             provider = ProviderRegistry.get(
                 self.db.get_setting("translation_provider", "google") or "google"
             )
             target_lang = self.db.get_setting("target_lang", "ru") or "ru"
-            translation = provider.translate(phrase, target_lang)
-            if translation:
-                self.db.add_translation(word_id, translation, target_lang)
+            trans = provider.translate(phrase, target_lang)
+            if trans:
+                self.db.add_translation(word_id, trans, target_lang)
 
-        return True
+        return self.db.get_word_by_phrase(phrase)
 
     def get_next_word(self) -> Optional[dict]:
         """Get next word due for review with translation in current target language."""

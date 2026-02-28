@@ -66,11 +66,11 @@ class VocabTrayApp:
         self.db.connect()
         self.db.init_schema()
         
-        # Set default settings if not set
-        self._init_default_settings()
-
         # Initialize services
         self.vocab_service = VocabService(self.db)
+        
+        # Set default settings if not set
+        self._init_default_settings()
 
         # State
         self.current_word = None
@@ -94,9 +94,9 @@ class VocabTrayApp:
 
         # GNOME tray warning (one-time)
         if self._get_desktop_environment() in ("gnome", "ubuntu"):
-            if not self.db.get_setting("gnome_tray_warning_shown"):
+            if not self.vocab_service.get_setting("gnome_tray_warning_shown"):
                 self.notify("GNOME detected. If tray icon is missing, install 'Top Icons' or 'Tray Icons' extension.", "Vocab")
-                self.db.set_setting("gnome_tray_warning_shown", "true")
+                self.vocab_service.set_setting("gnome_tray_warning_shown", "true")
 
     def notify(self, body, title="Vocab"):
         """Send notification with icon."""
@@ -111,8 +111,8 @@ class VocabTrayApp:
             "autostart": "false",
         }
         for key, value in defaults.items():
-            if self.db.get_setting(key) is None:
-                self.db.set_setting(key, value)
+            if self.vocab_service.get_setting(key) is None:
+                self.vocab_service.set_setting(key, value)
 
     def create_menu(self):
         """Create tray menu."""
