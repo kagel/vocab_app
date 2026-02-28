@@ -102,8 +102,8 @@ class SettingsWindow(Gtk.Window):
         box.pack_start(info_label, False, False, 0)
 
         # Commands info
-        gui_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "vocab_gui.py")
-        cmds_label = Gtk.Label(f"Save selected:   python3 {gui_path} --save\nDelete current: python3 {gui_path} --delete\nShow next:      python3 {gui_path} --next")
+        cli_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "vocab_cli.py")
+        cmds_label = Gtk.Label(f"Save selected:   python3 {cli_path} --save\nDelete current: python3 {cli_path} --delete\nShow next:      python3 {cli_path} --next")
         cmds_label.set_xalign(0)
         cmds_label.set_line_wrap(True)
         cmds_label.set_selectable(True)

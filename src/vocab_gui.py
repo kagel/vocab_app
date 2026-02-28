@@ -1,169 +1,19 @@
 #!/usr/bin/env python3
 """Main vocab GUI application with system tray."""
 
-import argparse
 import os
-import subprocess
-import sys
 import threading
 import time
-
-import pyperclip
-
-from config import read_config
-from db import Database
-from vocab import VocabService
-
-# Module-level icon path for CLI
-ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icons", "translate.svg")
-
-
-def notify_cli(body, title="Vocab"):
-    """Send notification - uses libnotify via subprocess (works on most Linux desktops)."""
-    args = ["notify-send", "-u", "low", title, body]
-    if os.path.exists(ICON_PATH):
-        args[1:1] = ["-i", ICON_PATH]
-    subprocess.run(args, check=False)
-
-
-def get_clipboard_text() -> str:
-    """Get text from primary selection (highlighted text) or clipboard."""
-    # Primary selection first - what user just highlighted/selected
-    try:
-        result = os.popen("xclip -o -selection primary 2>/dev/null").read().strip()
-        if result:
-            return result
-    except Exception:
-        pass
-    
-    # Wayland primary selection
-    if os.environ.get("WAYLAND_DISPLAY"):
-        try:
-            result = os.popen("wl-paste -p 2>/dev/null").read().strip()
-            if result:
-                return result
-        except Exception:
-            pass
-    
-    # Fallback: clipboard (what user explicitly copied)
-    try:
-        result = pyperclip.paste()
-        if result:
-            return result
-    except Exception:
-        pass
-    
-    return ""
-
-
-def run_cli():
-    """Handle CLI actions (for desktop hotkeys)."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--save", action="store_true", help="Save word from selection")
-    parser.add_argument("--delete", action="store_true", help="Delete current word")
-    parser.add_argument("--next", action="store_true", help="Show next word")
-    args = parser.parse_args()
-    
-    if not (args.save or args.delete or args.next):
-        return False
-    
-    default_data_dir = os.path.expanduser("~/.local/share/vocab_app")
-    db_path = os.path.join(default_data_dir, "vocab.db")
-    
-    if not os.path.exists(db_path):
-        print(f"Error: Database not found at {db_path}")
-        print("Please run the GUI app first to initialize the database.")
-        sys.exit(1)
-    
-    # Check config file for custom data_dir (JSON)
-    config_file = os.path.expanduser("~/.config/vocab_app/settings")
-    config = read_config(config_file)
-    custom_data_dir = config.get("data_dir")
-    
-    if custom_data_dir:
-        expanded = os.path.expanduser(custom_data_dir)
-        if os.path.exists(os.path.join(expanded, "vocab.db")):
-            db_path = os.path.join(expanded, "vocab.db")
-    
-    db = Database(db_path)
-    db.connect()
-    db.init_languages()
-    
-    vocab_service = VocabService(db)
-    
-    def get_lang_abbrev(code):
-        lang = db.get_language_by_code(code)
-        return lang.abbreviation if lang else code.upper()
-
-    if args.save:
-        try:
-            result = get_clipboard_text()
-            if not result:
-                notify_cli("No text selected")
-            else:
-                phrase = result.strip().lower()
-                if len(phrase) >= 1:
-                    success = vocab_service.add_word(phrase)
-                    if not success:
-                        word = vocab_service.db.get_word_by_phrase(phrase)
-                        if word:
-                            translation, trans_lang = vocab_service.get_translation_with_lang(word["id"])
-                            if translation:
-                                abbrev = get_lang_abbrev(trans_lang) if trans_lang else "—"
-                                notify_cli(f"<b>{phrase[:20]}</b> → {translation} [{abbrev}]")
-                            else:
-                                notify_cli(f"Already saved: {phrase[:30]}")
-                    else:
-                        word = vocab_service.db.get_word_by_phrase(phrase)
-                        if word:
-                            translation, trans_lang = vocab_service.get_translation_with_lang(word["id"])
-                            if translation:
-                                abbrev = get_lang_abbrev(trans_lang) if trans_lang else "—"
-                                notify_cli(f"<b>{phrase[:20]}</b> → {translation} [{abbrev}]")
-                            else:
-                                notify_cli(f"Word saved: {phrase[:30]}")
-                        else:
-                            notify_cli(f"Word saved: {phrase[:30]}")
-                else:
-                    notify_cli("Word too short (min 1 char)")
-        except Exception as e:
-            notify_cli(f"Error: {e}")
-    
-    if args.delete:
-        temp_file = "/tmp/last_vocab_phrase"
-        if os.path.exists(temp_file):
-            with open(temp_file) as f:
-                phrase = f.read().strip()
-            if phrase:
-                vocab_service.delete_word(phrase)
-                notify_cli(f"Word deleted: {phrase[:30]}")
-                os.remove(temp_file)
-    
-    if args.next:
-        word = vocab_service.get_next_word()
-        if word:
-            translation, trans_lang = vocab_service.get_translation_with_lang(word["id"])
-            phrase = word.get("phrase", "")
-            interval = word.get("interval_days", 1)
-            interval_str = f"{interval} day" if interval == 1 else f"{interval} days"
-            abbrev = get_lang_abbrev(trans_lang) if trans_lang else "—"
-            body = f"<b>{phrase}</b> [{interval_str}]"
-            if translation:
-                body += f"\n→ {translation} [{abbrev}]"
-            with open("/tmp/last_vocab_phrase", "w") as f:
-                f.write(phrase)
-            notify_cli(body)
-            vocab_service.skip_word(word["id"])
-    
-    db.close()
-    return True
-
 
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('AppIndicator3', '0.1')
 from gi.repository import Gtk, AppIndicator3
 
+from config import read_config
+from db import Database
+from vocab import VocabService
+from helpers import notify_cli
 from windows.stats import StatsWindow
 from windows.settings import SettingsWindow
 from windows.add_word import AddWordDialog
@@ -172,7 +22,6 @@ from windows.add_word import AddWordDialog
 class VocabTrayApp:
     """Main application with system tray."""
 
-    # Default data directory
     DEFAULT_DATA_DIR = os.path.expanduser("~/.local/share/vocab_app")
 
     def _get_desktop_environment(self) -> str:
@@ -194,7 +43,6 @@ class VocabTrayApp:
         self.config_file = os.path.join(config_dir, "settings")
         
         # Read custom data_dir from config file (JSON)
-        custom_data_dir = None
         config = read_config(self.config_file)
         custom_data_dir = config.get("data_dir")
         
@@ -218,7 +66,7 @@ class VocabTrayApp:
         self.db.connect()
         self.db.init_schema()
         
-        # Set default settings if not set (without data_dir - now in config file)
+        # Set default settings if not set
         self._init_default_settings()
 
         # Initialize services
@@ -385,13 +233,10 @@ class VocabTrayApp:
 
     def get_current_phrase(self):
         """Get current word from temp file or memory."""
-        # Try temp file first (for CLI compatibility)
         temp_file = "/tmp/last_vocab_phrase"
         if os.path.exists(temp_file):
             with open(temp_file) as f:
                 return f.read().strip()
-
-        # Fall back to current word
         return self.current_word.get("phrase") if self.current_word else None
 
     # Menu handlers
@@ -443,10 +288,7 @@ class VocabTrayApp:
 
 
 def main():
-    """Main entry point."""
-    if run_cli():
-        return
-    
+    """Main entry point - GUI only."""
     app = VocabTrayApp()
     Gtk.main()
 

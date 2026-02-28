@@ -286,7 +286,7 @@ class Database:
 
     def get_all_words(self) -> list:
         """Get all words with stats."""
-        words = self.session.query(Word).outerjoin(WordStats).outerjoin(Translation).order_by(Word.phrase).all()
+        words = self.session.query(Word).outerjoin(WordStats).outerjoin(Translation).outerjoin(Language).order_by(Word.phrase).all()
         
         results = []
         for word in words:
@@ -297,9 +297,15 @@ class Database:
                 "interval_days": word.stats.interval_days if word.stats else 1,
                 "due_date": word.stats.due_date if word.stats else None,
                 "ease_factor": word.stats.ease_factor if word.stats else 2.5,
+                "source": word.phrase,
+                "source_lang": "en",
             }
             if word.translations:
-                result["translation"] = word.translations[0].translation
+                result["target"] = word.translations[0].translation
+                result["target_lang"] = word.translations[0].language.code if word.translations[0].language else ""
+            else:
+                result["target"] = ""
+                result["target_lang"] = ""
             results.append(result)
         
         return results
@@ -378,13 +384,13 @@ class Database:
         words = self.get_all_words()
         with open(filepath, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(["phrase", "translation", "interval_days", "due_date"])
+            writer.writerow(["source", "target", "source language", "target language"])
             for word in words:
                 writer.writerow([
-                    word.get("phrase", ""),
-                    word.get("translation", ""),
-                    word.get("interval_days", ""),
-                    word.get("due_date", ""),
+                    word.get("source", ""),
+                    word.get("target", ""),
+                    word.get("source_lang", "en"),
+                    word.get("target_lang", ""),
                 ])
 
     def get_streak(self) -> int:

@@ -52,9 +52,9 @@ Configure in your desktop environment settings (usually Settings â†’ Keyboard â†
 
 | Command | Purpose |
 |---------|---------|
-| `python3 /path/to/src/vocab_gui.py --save` | Save selected text |
-| `python3 /path/to/src/vocab_gui.py --delete` | Delete current word |
-| `python3 /path/to/src/vocab_gui.py --next` | Show next word |
+| `python3 /path/to/src/vocab_cli.py --save` | Save selected text |
+| `python3 /path/to/src/vocab_cli.py --delete` | Delete current word |
+| `python3 /path/to/src/vocab_cli.py --next` | Show next word |
 
 ### Settings
 
