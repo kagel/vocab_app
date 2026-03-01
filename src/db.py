@@ -131,11 +131,14 @@ class Database:
             ("ko", "Korean", "KO"),
         ]
         
+        # Get all existing codes in one query
+        existing_codes = {lang.code for lang in self.session.query(Language.code).all()}
+        
         for code, name, abbrev in default_languages:
-            existing = self.session.query(Language).filter_by(code=code).first()
-            if not existing:
+            if code not in existing_codes:
                 lang = Language(code=code, name=name, abbreviation=abbrev)
                 self.session.add(lang)
+        
         self._commit()
 
     def get_language_by_code(self, code: str) -> Optional[Language]:
@@ -250,7 +253,7 @@ class Database:
 
     def get_due_words(self, limit: int = 20, target_lang: str = None) -> list:
         """Get words that are due for review, filtered and sorted in SQL."""
-        now = int(time.time())
+        now = int(datetime.now(timezone.utc).timestamp())
         
         query = self.session.query(Word).outerjoin(WordStats)
         
