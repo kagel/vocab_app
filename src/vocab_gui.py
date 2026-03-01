@@ -11,6 +11,7 @@ gi.require_version('AppIndicator3', '0.1')
 from gi.repository import Gtk, AppIndicator3
 
 from config import read_config
+from constants import DEFAULT_DATA_DIR, CONFIG_FILE, DEFAULT_DB_PATH, TEMP_PHRASE_FILE, AUTOSTART_FILE
 from db import Database
 from vocab import VocabService
 from helpers import notify_cli
@@ -21,8 +22,6 @@ from windows.add_word import AddWordDialog
 
 class VocabTrayApp:
     """Main application with system tray."""
-
-    DEFAULT_DATA_DIR = os.path.expanduser("~/.local/share/vocab_app")
 
     def _get_desktop_environment(self) -> str:
         """Detect desktop environment."""
@@ -39,24 +38,21 @@ class VocabTrayApp:
 
     def __init__(self):
         # Config file path
-        config_dir = os.path.expanduser("~/.config/vocab_app")
-        self.config_file = os.path.join(config_dir, "settings")
+        self.config_file = CONFIG_FILE
         
         # Read custom data_dir from config file (JSON)
         config = read_config(self.config_file)
         custom_data_dir = config.get("data_dir")
         
         # Determine DB path
-        default_db_path = os.path.join(self.DEFAULT_DATA_DIR, "vocab.db")
-        
         if custom_data_dir:
             custom_db_path = os.path.join(os.path.expanduser(custom_data_dir), "vocab.db")
             if os.path.exists(custom_db_path):
                 db_path = custom_db_path
             else:
-                db_path = default_db_path
+                db_path = DEFAULT_DB_PATH
         else:
-            db_path = default_db_path
+            db_path = DEFAULT_DB_PATH
         
         # Initialize DB with the decided path
         self.data_dir = os.path.dirname(db_path)
@@ -222,7 +218,7 @@ class VocabTrayApp:
             body += f"\n→ {translation} [{lang_abbrev_str}]"
 
         # Save to temp file for --delete hotkey
-        with open("/tmp/last_vocab_phrase", "w") as f:
+        with open(TEMP_PHRASE_FILE, "w") as f:
             f.write(phrase)
 
         # Use notify for popup
@@ -233,7 +229,7 @@ class VocabTrayApp:
 
     def get_current_phrase(self):
         """Get current word from temp file or memory."""
-        temp_file = "/tmp/last_vocab_phrase"
+        temp_file = TEMP_PHRASE_FILE
         if os.path.exists(temp_file):
             with open(temp_file) as f:
                 return f.read().strip()

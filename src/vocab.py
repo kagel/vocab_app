@@ -6,6 +6,7 @@ import time
 from typing import Optional
 from db import Database
 from translation import ProviderRegistry
+from constants import AUTOSTART_DIR, AUTOSTART_FILE, APP_NAME
 
 
 class VocabService:
@@ -44,11 +45,8 @@ class VocabService:
 
     def _set_autostart(self, enable: bool):
         """Enable or disable autostart."""
-        autostart_dir = os.path.expanduser("~/.config/autostart")
-        desktop_file = os.path.join(autostart_dir, "vocab_app.desktop")
-        
         if enable:
-            os.makedirs(autostart_dir, exist_ok=True)
+            os.makedirs(AUTOSTART_DIR, exist_ok=True)
             script_path = os.path.dirname(os.path.abspath(__file__))
             # venv is in project root, not in src/
             venv_python = os.path.join(os.path.dirname(script_path), "venv", "bin", "python3")
@@ -67,11 +65,11 @@ Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
 """
-            with open(desktop_file, "w") as f:
+            with open(AUTOSTART_FILE, "w") as f:
                 f.write(desktop_content)
         else:
-            if os.path.exists(desktop_file):
-                os.remove(desktop_file)
+            if os.path.exists(AUTOSTART_FILE):
+                os.remove(AUTOSTART_FILE)
 
     def add_word(self, phrase: str, translation: str = None, auto_translate: bool = False) -> dict:
         """Add a new word or add translation to existing word.

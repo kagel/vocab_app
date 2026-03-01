@@ -6,6 +6,7 @@ import os
 import sys
 
 from config import read_config
+from constants import CONFIG_FILE, DEFAULT_DB_PATH, TEMP_PHRASE_FILE
 from db import Database
 from helpers import notify_cli, get_clipboard_text
 from vocab import VocabService
@@ -23,21 +24,18 @@ def run_cli():
         return False
     
     # Config file path
-    config_file = os.path.expanduser("~/.config/vocab_app/settings")
-    config = read_config(config_file)
+    config = read_config(CONFIG_FILE)
     custom_data_dir = config.get("data_dir")
     
     # Determine DB path
-    default_db_path = os.path.join(os.path.expanduser("~/.local/share/vocab_app"), "vocab.db")
-    
     if custom_data_dir:
         custom_db_path = os.path.join(os.path.expanduser(custom_data_dir), "vocab.db")
         if os.path.exists(custom_db_path):
             db_path = custom_db_path
         else:
-            db_path = default_db_path
+            db_path = DEFAULT_DB_PATH
     else:
-        db_path = default_db_path
+        db_path = DEFAULT_DB_PATH
     
     if not os.path.exists(db_path):
         print(f"Error: Database not found at {db_path}")
@@ -78,7 +76,7 @@ def run_cli():
             notify_cli(f"Error: {e}")
     
     if args.delete:
-        temp_file = "/tmp/last_vocab_phrase"
+        temp_file = TEMP_PHRASE_FILE
         if os.path.exists(temp_file):
             with open(temp_file) as f:
                 phrase = f.read().strip()
@@ -98,7 +96,7 @@ def run_cli():
             body = f"<b>{phrase}</b> [{interval_str}]"
             if translation:
                 body += f"\n→ {translation} [{abbrev}]"
-            with open("/tmp/last_vocab_phrase", "w") as f:
+            with open(TEMP_PHRASE_FILE, "w") as f:
                 f.write(phrase)
             notify_cli(body)
             vocab_service.skip_word(word["id"])

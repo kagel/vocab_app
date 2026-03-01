@@ -9,6 +9,7 @@ from gi.repository import Gtk, GLib
 
 from translation import ProviderRegistry
 from config import read_config, write_config
+from constants import AUTOSTART_FILE, DEFAULT_DATA_DIR
 
 
 class SettingsWindow(Gtk.Window):
@@ -136,8 +137,7 @@ class SettingsWindow(Gtk.Window):
 
         self.autostart_check = Gtk.CheckButton(label="Start with system login")
         # Check both DB setting and actual file existence
-        desktop_file = os.path.expanduser("~/.config/autostart/vocab_app.desktop")
-        autostart = os.path.exists(desktop_file)
+        autostart = os.path.exists(AUTOSTART_FILE)
         self.autostart_check.set_active(autostart)
         box.pack_start(self.autostart_check, False, False, 0)
 
@@ -145,7 +145,7 @@ class SettingsWindow(Gtk.Window):
         section = self._make_section("DATA")
         box.pack_start(section, False, False, 0)
 
-        hint_label = Gtk.Label("Leave empty to use default: ~/.local/share/vocab_app")
+        hint_label = Gtk.Label(f"Leave empty to use default: {DEFAULT_DATA_DIR}")
         hint_label.set_xalign(0)
         hint_label.set_line_wrap(True)
         box.pack_start(hint_label, False, False, 0)

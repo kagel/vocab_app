@@ -395,6 +395,8 @@ class Database:
 
     def get_streak(self) -> int:
         """Calculate current streak (consecutive days with reviews)."""
+        today = datetime.now(timezone.utc).date()
+        
         rows = self.session.query(
             func.date(History.reviewed_at, 'unixepoch').label('day')
         ).distinct().order_by(
@@ -404,18 +406,13 @@ class Database:
         if not rows:
             return 0
         
-        days = [row[0] for row in rows]
-        today = datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m-%d")
-        streak = 0
-        expected_date = today
+        review_dates = {row[0] for row in rows}
         
-        for day in days:
-            if day == expected_date:
-                streak += 1
-                d = datetime.strptime(expected_date, "%Y-%m-%d")
-                d -= timedelta(days=1)
-                expected_date = d.strftime("%Y-%m-%d")
-            elif day < expected_date:
-                break
+        streak = 0
+        check_date = today
+        
+        while check_date.strftime("%Y-%m-%d") in review_dates:
+            streak += 1
+            check_date -= timedelta(days=1)
         
         return streak
