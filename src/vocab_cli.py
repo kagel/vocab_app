@@ -5,11 +5,8 @@ import argparse
 import os
 import sys
 
-from config import read_config
-from constants import CONFIG_FILE, DEFAULT_DB_PATH, TEMP_PHRASE_FILE
-from db import Database
-from helpers import notify_cli, get_clipboard_text
-from vocab import VocabService
+from constants import CONFIG_FILE, TEMP_PHRASE_FILE
+from helpers import notify_cli, get_clipboard_text, init_vocab_service
 
 
 def run_cli():
@@ -23,35 +20,10 @@ def run_cli():
     if not (args.save or args.delete or args.next):
         return False
     
-    # Config file path
-    config = read_config(CONFIG_FILE)
-    custom_data_dir = config.get("data_dir")
-    
-    # Determine DB path
-    if custom_data_dir:
-        custom_db_path = os.path.join(os.path.expanduser(custom_data_dir), "vocab.db")
-        if os.path.exists(custom_db_path):
-            db_path = custom_db_path
-        else:
-            db_path = DEFAULT_DB_PATH
-    else:
-        db_path = DEFAULT_DB_PATH
-    
-    if not os.path.exists(db_path):
-        print(f"Error: Database not found at {db_path}")
-        print("Please run the GUI app first to initialize the database.")
+    vocab_service = init_vocab_service(CONFIG_FILE, must_exist=True)
+    if not vocab_service:
         sys.exit(1)
     
-    db = Database(db_path)
-    db.connect()
-    db.init_languages()
-    
-    vocab_service = VocabService(db)
-    
-    def get_lang_abbrev(code):
-        lang = db.get_language_by_code(code)
-        return lang.abbreviation if lang else code.upper()
-
     if args.save:
         try:
             result = get_clipboard_text()
@@ -62,11 +34,10 @@ def run_cli():
                 if len(phrase) >= 1:
                     word = vocab_service.add_word(phrase, auto_translate=True)
                     
-                    # Show result
                     if word:
                         translation, trans_lang = vocab_service.get_translation_with_lang(word["id"])
                         if translation:
-                            abbrev = get_lang_abbrev(trans_lang) if trans_lang else "—"
+                            abbrev = vocab_service.get_language_abbreviation(trans_lang) if trans_lang else "—"
                             notify_cli(f"<b>{phrase[:20]}</b> → {translation} [{abbrev}]")
                         else:
                             notify_cli(f"Word saved: {phrase[:30]}")
@@ -86,22 +57,11 @@ def run_cli():
                 os.remove(temp_file)
     
     if args.next:
-        word = vocab_service.get_next_word()
-        if word:
-            translation, trans_lang = vocab_service.get_translation_with_lang(word["id"])
-            phrase = word.get("phrase", "")
-            interval = word.get("interval_days", 1)
-            interval_str = f"{interval} day" if interval == 1 else f"{interval} days"
-            abbrev = get_lang_abbrev(trans_lang) if trans_lang else "—"
-            body = f"<b>{phrase}</b> [{interval_str}]"
-            if translation:
-                body += f"\n→ {translation} [{abbrev}]"
-            with open(TEMP_PHRASE_FILE, "w") as f:
-                f.write(phrase)
+        body = vocab_service.get_next_word_notification()
+        if body:
             notify_cli(body)
-            vocab_service.skip_word(word["id"])
     
-    db.close()
+    vocab_service.db.close()
     return True
 
 

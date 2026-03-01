@@ -6,15 +6,15 @@ import threading
 import time
 
 import gi
+
 gi.require_version('Gtk', '3.0')
 gi.require_version('AppIndicator3', '0.1')
 from gi.repository import Gtk, AppIndicator3
 
-from config import read_config
-from constants import DEFAULT_DATA_DIR, CONFIG_FILE, DEFAULT_DB_PATH, TEMP_PHRASE_FILE, AUTOSTART_FILE
+from constants import CONFIG_FILE, TEMP_PHRASE_FILE
+from helpers import notify_cli, get_db_path
 from db import Database
 from vocab import VocabService
-from helpers import notify_cli
 from windows.stats import StatsWindow
 from windows.settings import SettingsWindow
 from windows.add_word import AddWordDialog
@@ -40,19 +40,8 @@ class VocabTrayApp:
         # Config file path
         self.config_file = CONFIG_FILE
         
-        # Read custom data_dir from config file (JSON)
-        config = read_config(self.config_file)
-        custom_data_dir = config.get("data_dir")
-        
         # Determine DB path
-        if custom_data_dir:
-            custom_db_path = os.path.join(os.path.expanduser(custom_data_dir), "vocab.db")
-            if os.path.exists(custom_db_path):
-                db_path = custom_db_path
-            else:
-                db_path = DEFAULT_DB_PATH
-        else:
-            db_path = DEFAULT_DB_PATH
+        db_path = get_db_path(self.config_file)
         
         # Initialize DB with the decided path
         self.data_dir = os.path.dirname(db_path)
@@ -186,46 +175,9 @@ class VocabTrayApp:
 
     def show_word_popup(self, word):
         """Show word popup notification."""
-        phrase = word.get("phrase", "")
-        interval = word.get("interval_days", 1)
-
-        # Format interval
-        if interval == 1:
-            interval_str = "1 day"
-        elif interval < 30:
-            interval_str = f"{interval} days"
-        elif interval < 365:
-            interval_str = f"{interval // 30} mo"
-        else:
-            interval_str = f"{interval // 365} yr"
-
-        # Get translation for current target language
-        settings = self.vocab_service.get_settings()
-        target_lang = settings.get("target_lang", "ru")
-        translation = self.vocab_service.get_translation(word["id"])
-        
-        # Get language abbreviation from vocab_service
-        languages = self.vocab_service.get_languages()
-        lang_abbrev_str = target_lang.upper()
-        for lang in languages:
-            if lang.code == target_lang:
-                lang_abbrev_str = lang.abbreviation
-                break
-
-        # Show notification
-        body = f"<b>{phrase}</b> [{interval_str}]"
-        if translation:
-            body += f"\n→ {translation} [{lang_abbrev_str}]"
-
-        # Save to temp file for --delete hotkey
-        with open(TEMP_PHRASE_FILE, "w") as f:
-            f.write(phrase)
-
-        # Use notify for popup
-        self.notify(body)
-
-        # Skip word after showing
-        self.vocab_service.skip_word(word["id"])
+        body = self.vocab_service.get_next_word_notification()
+        if body:
+            self.notify(body)
 
     def get_current_phrase(self):
         """Get current word from temp file or memory."""

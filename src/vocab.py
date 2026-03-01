@@ -194,6 +194,54 @@ X-GNOME-Autostart-enabled=true
         target_lang = self.db.get_setting("target_lang", "ru") or "ru"
         return self.db.get_translation(word_id, target_lang)
 
+    def get_language_abbreviation(self, lang_code: str) -> str:
+        """Get language abbreviation for a code."""
+        lang = self.db.get_language_by_code(lang_code)
+        return lang.abbreviation if lang else lang_code.upper()
+
+    def format_interval(self, interval: int) -> str:
+        """Format interval days to human-readable string."""
+        if interval == 1:
+            return "1 day"
+        elif interval < 30:
+            return f"{interval} days"
+        elif interval < 365:
+            return f"{interval // 30} mo"
+        else:
+            return f"{interval // 365} yr"
+
+    def get_next_word_notification(self) -> Optional[str]:
+        """Get next word and format notification body. Also saves phrase to temp file.
+        
+        Returns:
+            Notification body string or None if no word
+        """
+        word = self.get_next_word()
+        if not word:
+            return None
+        
+        phrase = word.get("phrase", "")
+        interval = word.get("interval_days", 1)
+        
+        translation, trans_lang = self.get_translation_with_lang(word["id"])
+        
+        interval_str = self.format_interval(interval)
+        abbrev = self.get_language_abbreviation(trans_lang) if trans_lang else "—"
+        
+        body = f"<b>{phrase}</b> [{interval_str}]"
+        if translation:
+            body += f"\n→ {translation} [{abbrev}]"
+        
+        # Save to temp file for --delete hotkey
+        from constants import TEMP_PHRASE_FILE
+        with open(TEMP_PHRASE_FILE, "w") as f:
+            f.write(phrase)
+        
+        # Skip word after getting it
+        self.skip_word(word["id"])
+        
+        return body
+
     def get_translation_with_lang(self, word_id: int) -> tuple[Optional[str], Optional[str]]:
         """Get translation and its language code."""
         target_lang = self.db.get_setting("target_lang", "ru") or "ru"
