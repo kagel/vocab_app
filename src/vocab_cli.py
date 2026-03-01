@@ -41,6 +41,10 @@ def run_cli():
                             notify_cli(f"<b>{phrase[:20]}</b> → {translation} [{abbrev}]")
                         else:
                             notify_cli(f"Word saved: {phrase[:30]}")
+                        
+                        # Save to temp file for --delete hotkey
+                        with open(TEMP_PHRASE_FILE, "w") as f:
+                            f.write(phrase)
                 else:
                     notify_cli("Word too short (min 1 char)")
         except Exception as e:

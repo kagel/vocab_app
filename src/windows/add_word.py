@@ -5,6 +5,8 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
+from constants import TEMP_PHRASE_FILE
+
 
 class AddWordDialog(Gtk.Window):
     """Add word dialog."""
@@ -86,6 +88,10 @@ class AddWordDialog(Gtk.Window):
         translation = self.translation_entry.get_text().strip() or None
         self.vocab_service.add_word(word, translation, auto_translate=False)
 
+        # Save to temp file for --delete hotkey
+        with open(TEMP_PHRASE_FILE, "w") as f:
+            f.write(word)
+
         if self.on_add:
             self.on_add(word)
         self.destroy()
@@ -97,6 +103,10 @@ class AddWordDialog(Gtk.Window):
             return
 
         self.vocab_service.add_word(word, None, auto_translate=True)
+
+        # Save to temp file for --delete hotkey
+        with open(TEMP_PHRASE_FILE, "w") as f:
+            f.write(word)
 
         if self.on_add:
             self.on_add(word)

@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """Database module for vocab app using SQLAlchemy."""
 
-import os
-import time
-import glob
 import csv
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
 from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, UniqueConstraint
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session, scoped_session
 from sqlalchemy import func, and_
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session, scoped_session
 
 Base = declarative_base()
 
