@@ -232,8 +232,12 @@ class SettingsWindow(Gtk.Window):
         
         # Save data_dir to config file instead of DB
         new_data_dir = self.data_dir_entry.get_text().strip()
+        data_dir_changed = False
         if self.config_file:
             config = read_config(self.config_file)
+            old_data_dir = config.get("data_dir", "")
+            if old_data_dir != new_data_dir:
+                data_dir_changed = True
             config["data_dir"] = new_data_dir
             write_config(self.config_file, config)
 
@@ -243,12 +247,17 @@ class SettingsWindow(Gtk.Window):
             self.on_save(settings)
 
         # Show confirmation
+        if data_dir_changed:
+            msg_text = "Settings saved!\n\nNote: You need to restart the app for data directory changes to take effect."
+        else:
+            msg_text = "Settings saved successfully!"
+        
         msg = Gtk.MessageDialog(
             self,
             Gtk.DialogFlags.DESTROY_WITH_PARENT,
             Gtk.MessageType.INFO,
             Gtk.ButtonsType.OK,
-            "Settings saved successfully!"
+            msg_text
         )
         msg.run()
         msg.destroy()

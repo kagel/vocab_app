@@ -52,8 +52,9 @@ def get_db_path(config_file: str = CONFIG_FILE) -> str:
     
     if custom_data_dir:
         custom_db_path = os.path.join(os.path.expanduser(custom_data_dir), "vocab.db")
-        if os.path.exists(custom_db_path):
-            return custom_db_path
+        # If custom path is specified, use it (create directory if needed)
+        os.makedirs(os.path.dirname(custom_db_path), exist_ok=True)
+        return custom_db_path
     
     return DEFAULT_DB_PATH
 

@@ -16,6 +16,7 @@ class WordBrowserWindow(Gtk.Window):
         self.vocab_service = vocab_service
         self.selected_word_id = None
         self.words = []
+        self._search_timeout_id = None
         self.set_default_size(910, 600)
         self.set_position(Gtk.WindowPosition.CENTER)
 
@@ -171,7 +172,18 @@ class WordBrowserWindow(Gtk.Window):
 
     def on_search_changed(self, widget):
         """Handle search text changed."""
-        GLib.timeout_add(300, self.load_words)
+        # Cancel previous timeout
+        if self._search_timeout_id is not None:
+            GLib.source_remove(self._search_timeout_id)
+        
+        # Add new timeout
+        self._search_timeout_id = GLib.timeout_add(300, self._do_search)
+
+    def _do_search(self):
+        """Execute search after debounce."""
+        self._search_timeout_id = None
+        self.load_words()
+        return False
 
     def on_lang_changed(self, widget):
         """Handle language filter changed."""
