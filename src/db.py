@@ -287,7 +287,6 @@ class Database:
         return results
 
     def get_all_words(self, search: str = None, target_lang: str = None) -> list:
-        #TODO: optimize
         """Get all words with stats, optionally filtered by search term and language."""
         lang = None
         if target_lang:
@@ -295,39 +294,54 @@ class Database:
             if not lang:
                 return []
         
-        query = self.session.query(Word).outerjoin(WordStats)
-        
+        # Build the main query
         if lang:
-            query = query.outerjoin(Translation, Translation.word_id == Word.id)
-            query = query.filter(Translation.language_id == lang.id)
+            # When filtering by language, use INNER join to only get words with that translation
+            query = self.session.query(
+                Word,
+                Translation.translation.label('target'),
+            ).outerjoin(WordStats, WordStats.word_id == Word.id).join(
+                Translation, (Translation.word_id == Word.id) & (Translation.language_id == lang.id)
+            )
         else:
-            query = query.outerjoin(Translation).outerjoin(Language)
+            # When not filtering, get first translation with language code
+            first_trans = self.session.query(
+                Translation.word_id,
+                Translation.translation,
+                Language.code.label('lang_code'),
+            ).join(Language, Language.id == Translation.language_id).subquery()
+            
+            query = self.session.query(
+                Word,
+                func.coalesce(first_trans.c.translation, '').label('target'),
+                func.coalesce(first_trans.c.lang_code, '').label('target_lang_code'),
+            ).outerjoin(WordStats, WordStats.word_id == Word.id).outerjoin(
+                first_trans, first_trans.c.word_id == Word.id
+            )
         
         if search:
             search_term = f"%{search}%"
-            query = query.filter(
-                (Word.phrase.ilike(search_term)) | 
-                (Translation.translation.ilike(search_term))
-            )
+            if lang:
+                query = query.filter(
+                    (Word.phrase.ilike(search_term)) | 
+                    (Translation.translation.ilike(search_term))
+                )
+            else:
+                query = query.filter(Word.phrase.ilike(search_term))
         
         # Use distinct to avoid duplicates
-        words = query.distinct(Word.id).order_by(Word.phrase).all()
+        rows = query.distinct(Word.id).order_by(Word.phrase).all()
         
         results = []
-        for word in words:
-            # Get translation for current target language if specified
-            target = ""
-            target_lang_code = ""
+        for row in rows:
+            word = row[0]
+            target = row[1]
+            
+            # Get target_lang - from parameter if filtering, else from query
             if lang:
-                trans = self.session.query(Translation).filter_by(word_id=word.id, language_id=lang.id).first()
-                if trans:
-                    target = trans.translation
-                    target_lang_code = target_lang
+                target_lang_code = target_lang
             else:
-                # Just get first translation
-                if word.translations:
-                    target = word.translations[0].translation
-                    target_lang_code = word.translations[0].language.code if word.translations[0].language else ""
+                target_lang_code = row[2] if len(row) > 2 else ""
             
             result = {
                 "id": word.id,
@@ -338,8 +352,8 @@ class Database:
                 "ease_factor": word.stats.ease_factor if word.stats else 2.5,
                 "source": word.phrase,
                 "source_lang": "en",
-                "target": target,
-                "target_lang": target_lang_code,
+                "target": target or "",
+                "target_lang": target_lang_code or "",
             }
             results.append(result)
         
