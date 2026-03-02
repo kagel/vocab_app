@@ -1,6 +1,6 @@
 # Vocabulary App
 
-A lightweight vocabulary learning app with system tray and spaced repetition. Supports Linux desktop (XFCE, GNOME, etc.) with GTK.
+A lightweight vocabulary learning app with system tray and spaced repetition. Supports Linux desktop (XFCE, GNOME, etc.) with GTK. You control what you learn. Period.
 
 ## Features
 
