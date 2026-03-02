@@ -65,7 +65,7 @@ def run_cli():
         if body:
             notify_cli(body)
     
-    vocab_service.db.close()
+    vocab_service.close()
     return True
 
 

@@ -81,9 +81,4 @@ def init_vocab_service(config_file: str = CONFIG_FILE, must_exist: bool = False)
         data_dir = os.path.dirname(db_path)
         os.makedirs(data_dir, exist_ok=True)
     
-    db = Database(db_path)
-    db.connect()
-    db.init_schema()
-    db.init_languages()
-    
-    return VocabService(db)
+    return VocabService(db_path)

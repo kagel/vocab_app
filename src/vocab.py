@@ -12,8 +12,10 @@ from constants import AUTOSTART_DIR, AUTOSTART_FILE, APP_NAME
 class VocabService:
     """Vocabulary service with spaced repetition."""
 
-    def __init__(self, db: Database):
-        self.db = db
+    def __init__(self, db_path: str):
+        self.db = Database(db_path)
+        self.db.connect()
+        self.db.init_schema()
 
     def get_settings(self) -> dict:
         """Get app settings."""
@@ -298,6 +300,10 @@ X-GNOME-Autostart-enabled=true
                         self.db.session.delete(word)
                 
                 self.db._commit()
+
+    def close(self):
+        """Close database connection."""
+        self.db.close()
 
     def get_language_counts(self) -> dict:
         """Get word count per language."""

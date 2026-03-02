@@ -2,6 +2,7 @@
 """Main vocab GUI application with system tray."""
 
 import os
+import sys
 import threading
 import time
 
@@ -12,9 +13,7 @@ gi.require_version('AppIndicator3', '0.1')
 from gi.repository import Gtk, AppIndicator3
 
 from constants import CONFIG_FILE, TEMP_PHRASE_FILE
-from helpers import notify_cli, get_db_path
-from db import Database
-from vocab import VocabService
+from helpers import notify_cli, init_vocab_service
 from windows.stats import StatsWindow
 from windows.settings import SettingsWindow
 from windows.add_word import AddWordDialog
@@ -41,19 +40,18 @@ class VocabTrayApp:
         # Config file path
         self.config_file = CONFIG_FILE
         
-        # Determine DB path
-        db_path = get_db_path(self.config_file)
-        
-        # Initialize DB with the decided path
-        self.data_dir = os.path.dirname(db_path)
-        os.makedirs(self.data_dir, exist_ok=True)
-        
-        self.db = Database(db_path)
-        self.db.connect()
-        self.db.init_schema()
-        
         # Initialize services
-        self.vocab_service = VocabService(self.db)
+        self.vocab_service = init_vocab_service(self.config_file)
+        if not self.vocab_service:
+            error_dialog = Gtk.MessageDialog(
+                None,
+                Gtk.DialogFlags.DESTROY_WITH_PARENT,
+                Gtk.MessageType.ERROR,
+                Gtk.ButtonsType.OK,
+                "Failed to initialize database. Check your settings."
+            )
+            error_dialog.run()
+            sys.exit(1)
         
         # Set default settings if not set
         self._init_default_settings()
@@ -109,6 +107,16 @@ class VocabTrayApp:
         next_item.connect("activate", self.on_show_next)
         menu.append(next_item)
 
+        # Pause
+        self.pause_item = Gtk.MenuItem(label="Pause (1 hour)")
+        self.pause_item.connect("activate", self.on_pause)
+        menu.append(self.pause_item)
+
+        # Separator
+        sep1 = Gtk.MenuItem(label="───────────")
+        sep1.set_sensitive(False)
+        menu.append(sep1)
+
         # Add word
         add_item = Gtk.MenuItem(label="Add word")
         add_item.connect("activate", self.on_add_word)
@@ -119,24 +127,20 @@ class VocabTrayApp:
         browser_item.connect("activate", self.on_word_browser)
         menu.append(browser_item)
 
-        menu.append(Gtk.SeparatorMenuItem())
-
-        # Pause
-        self.pause_item = Gtk.MenuItem(label="Pause (1 hour)")
-        self.pause_item.connect("activate", self.on_pause)
-        menu.append(self.pause_item)
+        # Stats
+        stats_item = Gtk.MenuItem(label="Stats")
+        stats_item.connect("activate", self.on_show_stats)
+        menu.append(stats_item)
 
         # Settings
         settings_item = Gtk.MenuItem(label="Settings")
         settings_item.connect("activate", self.on_settings)
         menu.append(settings_item)
 
-        # Stats
-        stats_item = Gtk.MenuItem(label="Stats")
-        stats_item.connect("activate", self.on_show_stats)
-        menu.append(stats_item)
-
-        menu.append(Gtk.SeparatorMenuItem())
+        # Separator
+        sep2 = Gtk.MenuItem(label="───────────")
+        sep2.set_sensitive(False)
+        menu.append(sep2)
 
         # Quit
         quit_item = Gtk.MenuItem(label="Quit")
@@ -242,7 +246,7 @@ class VocabTrayApp:
     def on_quit(self, widget):
         """Quit application."""
         self.running = False
-        self.db.close()
+        self.vocab_service.close()
         Gtk.main_quit()
 
 
