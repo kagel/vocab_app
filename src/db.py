@@ -286,12 +286,49 @@ class Database:
         
         return results
 
-    def get_all_words(self) -> list:
-        """Get all words with stats."""
-        words = self.session.query(Word).outerjoin(WordStats).outerjoin(Translation).outerjoin(Language).order_by(Word.phrase).all()
+    def get_all_words(self, search: str = None, target_lang: str = None) -> list:
+        #TODO: optimize
+        """Get all words with stats, optionally filtered by search term and language."""
+        lang = None
+        if target_lang:
+            lang = self.get_language_by_code(target_lang)
+            if not lang:
+                return []
+        
+        query = self.session.query(Word).outerjoin(WordStats)
+        
+        if lang:
+            query = query.outerjoin(Translation, Translation.word_id == Word.id)
+            query = query.filter(Translation.language_id == lang.id)
+        else:
+            query = query.outerjoin(Translation).outerjoin(Language)
+        
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                (Word.phrase.ilike(search_term)) | 
+                (Translation.translation.ilike(search_term))
+            )
+        
+        # Use distinct to avoid duplicates
+        words = query.distinct(Word.id).order_by(Word.phrase).all()
         
         results = []
         for word in words:
+            # Get translation for current target language if specified
+            target = ""
+            target_lang_code = ""
+            if lang:
+                trans = self.session.query(Translation).filter_by(word_id=word.id, language_id=lang.id).first()
+                if trans:
+                    target = trans.translation
+                    target_lang_code = target_lang
+            else:
+                # Just get first translation
+                if word.translations:
+                    target = word.translations[0].translation
+                    target_lang_code = word.translations[0].language.code if word.translations[0].language else ""
+            
             result = {
                 "id": word.id,
                 "phrase": word.phrase,
@@ -301,13 +338,9 @@ class Database:
                 "ease_factor": word.stats.ease_factor if word.stats else 2.5,
                 "source": word.phrase,
                 "source_lang": "en",
+                "target": target,
+                "target_lang": target_lang_code,
             }
-            if word.translations:
-                result["target"] = word.translations[0].translation
-                result["target_lang"] = word.translations[0].language.code if word.translations[0].language else ""
-            else:
-                result["target"] = ""
-                result["target_lang"] = ""
             results.append(result)
         
         return results
@@ -356,6 +389,22 @@ class Database:
             WordStats.interval_days > 7
         ).scalar() or 0
 
+        # Streak calculation
+        today_date = datetime.now(timezone.utc).date()
+        rows = self.session.query(
+            func.date(History.reviewed_at, 'unixepoch').label('day')
+        ).distinct().order_by(
+            func.date(History.reviewed_at, 'unixepoch').desc()
+        ).all()
+        
+        streak = 0
+        if rows:
+            review_dates = {row[0] for row in rows}
+            check_date = today_date
+            while check_date.strftime("%Y-%m-%d") in review_dates:
+                streak += 1
+                check_date -= timedelta(days=1)
+
         return {
             "total_words": total,
             "today_words": today_words,
@@ -364,6 +413,7 @@ class Database:
             "due_count": due_count,
             "short_interval": short_interval,
             "long_interval": long_interval,
+            "streak": streak,
         }
 
     def get_setting(self, key: str, default: str = None) -> Optional[str]:
@@ -383,6 +433,7 @@ class Database:
 
     def export_csv(self, filepath: str):
         """Export words to CSV."""
+        import csv
         words = self.get_all_words()
         with open(filepath, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
@@ -395,26 +446,18 @@ class Database:
                     word.get("target_lang", ""),
                 ])
 
-    def get_streak(self) -> int:
-        """Calculate current streak (consecutive days with reviews)."""
-        today = datetime.now(timezone.utc).date()
+    def get_language_counts(self) -> dict:
+        """Get word count per language."""
+        from sqlalchemy import func
+        # Count distinct words per language, only for words that exist
+        results = self.session.query(
+            Language.code,
+            Language.name,
+            func.count(func.distinct(Translation.word_id)).label('count')
+        ).join(
+            Translation, Translation.language_id == Language.id
+        ).join(
+            Word, Word.id == Translation.word_id
+        ).group_by(Language.id).all()
         
-        rows = self.session.query(
-            func.date(History.reviewed_at, 'unixepoch').label('day')
-        ).distinct().order_by(
-            func.date(History.reviewed_at, 'unixepoch').desc()
-        ).all()
-        
-        if not rows:
-            return 0
-        
-        review_dates = {row[0] for row in rows}
-        
-        streak = 0
-        check_date = today
-        
-        while check_date.strftime("%Y-%m-%d") in review_dates:
-            streak += 1
-            check_date -= timedelta(days=1)
-        
-        return streak
+        return {row.code: (row.name, row.count) for row in results}

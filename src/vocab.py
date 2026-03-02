@@ -4,7 +4,7 @@
 import os
 import time
 from typing import Optional
-from db import Database
+from db import Database, Word, Translation, Language
 from translation import ProviderRegistry
 from constants import AUTOSTART_DIR, AUTOSTART_FILE, APP_NAME
 
@@ -248,11 +248,64 @@ X-GNOME-Autostart-enabled=true
         translation = self.db.get_translation(word_id, target_lang)
         return translation, target_lang
 
+    def get_words(self, search: str = None, target_lang: str = None) -> list:
+        """Get all words with optional search and language filter."""
+        return self.db.get_all_words(search, target_lang)
+
+    def update_word(self, word_id: int, phrase: str, translation: str = None):
+        """Update word phrase and optionally translation."""
+        word = self.db.session.query(Word).filter_by(id=word_id).first()
+        if word:
+            word.phrase = phrase.lower()
+            if translation:
+                target_lang = self.db.get_setting("target_lang", "ru") or "ru"
+                lang = self.db.get_language_by_code(target_lang)
+                if lang:
+                    existing_trans = self.db.session.query(Translation).filter_by(
+                        word_id=word_id, language_id=lang.id
+                    ).first()
+                    if existing_trans:
+                        existing_trans.translation = translation
+                    else:
+                        trans = Translation(word_id=word_id, language_id=lang.id, translation=translation)
+                        self.db.session.add(trans)
+            self.db._commit()
+
+    def delete_word_by_id(self, word_id: int):
+        """Delete a word by ID."""
+        word = self.db.session.query(Word).filter_by(id=word_id).first()
+        if word:
+            self.db.session.delete(word)
+            self.db._commit()
+
+    def delete_translation(self, word_id: int, target_lang: str):
+        """Delete only translation for specific language, not the word.
+        If no translations left, delete the word itself."""
+        lang = self.db.get_language_by_code(target_lang)
+        if lang:
+            trans = self.db.session.query(Translation).filter_by(
+                word_id=word_id, language_id=lang.id
+            ).first()
+            if trans:
+                self.db.session.delete(trans)
+                
+                # Check if word has any other translations
+                remaining = self.db.session.query(Translation).filter_by(word_id=word_id).count()
+                if remaining == 0:
+                    # No translations left, delete the word
+                    word = self.db.session.query(Word).filter_by(id=word_id).first()
+                    if word:
+                        self.db.session.delete(word)
+                
+                self.db._commit()
+
+    def get_language_counts(self) -> dict:
+        """Get word count per language."""
+        return self.db.get_language_counts()
+
     def get_stats(self) -> dict:
         """Get statistics."""
-        stats = self.db.get_stats()
-        stats["streak"] = self.db.get_streak()
-        return stats
+        return self.db.get_stats()
 
     def test_translation_api(self) -> bool:
         """Test if translation API works."""

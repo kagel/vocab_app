@@ -18,6 +18,7 @@ from vocab import VocabService
 from windows.stats import StatsWindow
 from windows.settings import SettingsWindow
 from windows.add_word import AddWordDialog
+from windows.word_browser import WordBrowserWindow
 
 
 class VocabTrayApp:
@@ -112,6 +113,11 @@ class VocabTrayApp:
         add_item = Gtk.MenuItem(label="Add word")
         add_item.connect("activate", self.on_add_word)
         menu.append(add_item)
+
+        # Word Browser
+        browser_item = Gtk.MenuItem(label="Word Browser")
+        browser_item.connect("activate", self.on_word_browser)
+        menu.append(browser_item)
 
         menu.append(Gtk.SeparatorMenuItem())
 
@@ -226,6 +232,11 @@ class VocabTrayApp:
     def on_settings(self, widget):
         """Show settings window."""
         win = SettingsWindow(self.vocab_service, config_file=self.config_file)
+        win.show_all()
+
+    def on_word_browser(self, widget):
+        """Show word browser window."""
+        win = WordBrowserWindow(self.vocab_service)
         win.show_all()
 
     def on_quit(self, widget):
