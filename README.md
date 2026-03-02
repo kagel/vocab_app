@@ -10,8 +10,10 @@ A lightweight vocabulary learning app with system tray and spaced repetition. Su
 - **Auto-translation**: Automatic translation via multiple providers
 - **Multiple translation providers**: Google (direct), Google (deep-translator), EasyGoogle, MyMemory
 - **Stats dashboard**: See words learned, streak, reviews today
+- **Word Browser**: View, search, edit and delete all words
 - **Autostart**: Automatically starts on login
 - **Multiple languages**: Support for 9 target languages
+- **Custom data directory**: Store database anywhere (e.g., Dropbox for sync)
 
 ## Screenshots
 
@@ -26,6 +28,9 @@ A lightweight vocabulary learning app with system tray and spaced repetition. Su
 
 ### Statistics Window
 ![Stats](docs/screenshot-stats.png)
+
+### Word Browser
+![Word Browser](docs/screenshot-word-browser.png)
 
 ### Popup Translation Message
 ![Stats](docs/screenshot-message.png)
