@@ -21,7 +21,7 @@ class SettingsWindow(Gtk.Window):
         self.vocab_service = vocab_service
         self.on_save = on_save
         self.config_file = config_file
-        self.set_default_size(550, 920)
+        self.set_default_size(560, 970)
         self.set_position(Gtk.WindowPosition.CENTER)
 
         self.recording_key = None
