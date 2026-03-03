@@ -11,6 +11,7 @@ A lightweight vocabulary learning app with system tray and spaced repetition. Su
 - **Multiple translation providers**: Google (direct), Google (deep-translator), EasyGoogle, MyMemory
 - **Stats dashboard**: See words learned, streak, reviews today
 - **Word Browser**: View, search, edit and delete all words
+- **Word of the Day**: Daily vocabulary boost with CEFR-level words (A1-C2)
 - **Autostart**: Automatically starts on login
 - **Multiple languages**: Support for 9 target languages
 - **Custom data directory**: Store database anywhere (e.g., Dropbox for sync)
@@ -73,6 +74,7 @@ Configure in your desktop environment settings (usually Settings â†’ Keyboard â†
 - **Review interval**: How often to show words (30min - 8hours)
 - **Translation provider**: Choose between Google Translate (direct), Google Translate (deep-translator), EasyGoogle Translate, or MyMemory (free)
 - **Target language**: Translation language (Russian, Spanish, French, German, Italian, Portuguese, Japanese, Chinese, Korean)
+- **Word of the Day**: Enable/disable daily word notifications with CEFR level selection (A1-C2)
 - **Autostart**: Automatically starts on system login
 - **Custom data directory**: Store database elsewhere
 
