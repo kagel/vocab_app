@@ -197,11 +197,16 @@ class VocabTrayApp:
         try:
             wotd = self.vocab_service.get_word_of_the_day()
             if wotd:
-                self.vocab_service.save_wotd_to_vocab(wotd['word'], wotd['translation'])
-                body = f"<b>{wotd['word']}</b> [{wotd['level']}]\n→ {wotd['translation']}\n\nSaved to your words!"
+                result, success = self.vocab_service.save_wotd_to_vocab(wotd['word'], wotd['translation'])
+                if success:
+                    body = f"<b>{wotd['word']}</b> [{wotd['level']}]\n→ {wotd['translation']}\n\nSaved to your words!"
+                else:
+                    body = f"<b>{wotd['word']}</b> [{wotd['level']}]\n→ {wotd['translation']}"
                 self.notify(body, "Word of the Day")
         except Exception as e:
             print(f"WOTD error: {e}")
+        finally:
+            self.vocab_service.remove_session()
 
     def get_current_phrase(self):
         """Get current word from temp file or memory."""

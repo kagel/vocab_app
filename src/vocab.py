@@ -306,6 +306,10 @@ X-GNOME-Autostart-enabled=true
         """Close database connection."""
         self.db.close()
 
+    def remove_session(self):
+        """Remove database session (for thread cleanup)."""
+        self.db.remove_session()
+
     def get_language_counts(self) -> dict:
         """Get word count per language."""
         return self.db.get_language_counts()
@@ -377,6 +381,15 @@ X-GNOME-Autostart-enabled=true
             "target_lang": target_lang
         }
 
-    def save_wotd_to_vocab(self, word: str, translation: str = None) -> dict:
-        """Save WOTD word to user's vocabulary."""
-        return self.add_word(word, translation, auto_translate=(translation is None))
+    def save_wotd_to_vocab(self, word: str, translation: str = None) -> tuple[dict|None, bool]:
+        """Save WOTD word to user's vocabulary.
+        
+        Returns:
+            tuple of (result dict, success bool)
+        """
+        try:
+            result = self.add_word(word, translation, auto_translate=(translation is None))
+            return result, True
+        except Exception as e:
+            print(f"Failed to save WOTD to vocab: {e}")
+            return None, False
