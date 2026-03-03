@@ -82,6 +82,9 @@ class VocabTrayApp:
                 self.notify("GNOME detected. If tray icon is missing, install 'Top Icons' or 'Tray Icons' extension.", "Vocab")
                 self.vocab_service.set_setting("gnome_tray_warning_shown", "true")
 
+        # Word of the Day (delayed to not block startup)
+        threading.Timer(2.0, self.check_wotd).start()
+
     def notify(self, body, title="Vocab"):
         """Send notification with icon."""
         notify_cli(body, title)
@@ -188,6 +191,17 @@ class VocabTrayApp:
         body = self.vocab_service.get_next_word_notification()
         if body:
             self.notify(body)
+
+    def check_wotd(self):
+        """Check and show Word of the Day if enabled."""
+        try:
+            wotd = self.vocab_service.get_word_of_the_day()
+            if wotd:
+                self.vocab_service.save_wotd_to_vocab(wotd['word'], wotd['translation'])
+                body = f"<b>{wotd['word']}</b> [{wotd['level']}]\n→ {wotd['translation']}\n\nSaved to your words!"
+                self.notify(body, "Word of the Day")
+        except Exception as e:
+            print(f"WOTD error: {e}")
 
     def get_current_phrase(self):
         """Get current word from temp file or memory."""

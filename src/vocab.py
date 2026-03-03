@@ -7,6 +7,7 @@ from typing import Optional
 from db import Database, Word, Translation, Language
 from translation import ProviderRegistry
 from constants import AUTOSTART_DIR, AUTOSTART_FILE, APP_NAME
+from wotd import get_word_source, WordSourceType
 
 
 class VocabService:
@@ -326,3 +327,56 @@ X-GNOME-Autostart-enabled=true
     def export_csv(self, filepath: str):
         """Export words to CSV."""
         self.db.export_csv(filepath)
+
+    def is_wotd_enabled(self) -> bool:
+        """Check if Word of the Day is enabled."""
+        enabled = self.db.get_setting("wotd_enabled", "false")
+        return enabled == "true"
+
+    def get_wotd_level(self) -> str:
+        """Get the configured WOTD level."""
+        return self.db.get_setting("wotd_level", "B2")
+
+    def get_word_of_the_day(self) -> Optional[dict]:
+        """Get Word of the Day with translation.
+        
+        Returns:
+            dict with word, level, translation, or None if disabled or translation fails
+        """
+        if not self.is_wotd_enabled():
+            return None
+
+        if self.db.get_wotd_today():
+            return None
+
+        level = self.get_wotd_level()
+        source = get_word_source(WordSourceType.LOCAL)
+        
+        word_data = source.get_word(level)
+        if not word_data:
+            return None
+
+        word = word_data["word"]
+        word_level = word_data["level"]
+
+        provider_name = self.db.get_setting("translation_provider", "google_direct")
+        provider = ProviderRegistry.get(provider_name)
+        target_lang = self.db.get_setting("target_lang", "ru")
+
+        translation = provider.translate(word, target_lang)
+        
+        if not translation:
+            return None
+
+        self.db.mark_wotd_shown(word, word_level)
+
+        return {
+            "word": word,
+            "level": word_level,
+            "translation": translation,
+            "target_lang": target_lang
+        }
+
+    def save_wotd_to_vocab(self, word: str, translation: str = None) -> dict:
+        """Save WOTD word to user's vocabulary."""
+        return self.add_word(word, translation, auto_translate=(translation is None))

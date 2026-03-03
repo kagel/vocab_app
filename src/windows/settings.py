@@ -10,6 +10,7 @@ from gi.repository import Gtk, GLib
 from translation import ProviderRegistry
 from config import read_config, write_config
 from constants import AUTOSTART_FILE, DEFAULT_DATA_DIR
+from wotd import CEFR_LEVELS
 
 
 class SettingsWindow(Gtk.Window):
@@ -20,7 +21,7 @@ class SettingsWindow(Gtk.Window):
         self.vocab_service = vocab_service
         self.on_save = on_save
         self.config_file = config_file
-        self.set_default_size(550, 840)
+        self.set_default_size(550, 920)
         self.set_position(Gtk.WindowPosition.CENTER)
 
         self.recording_key = None
@@ -163,6 +164,26 @@ class SettingsWindow(Gtk.Window):
         dir_box.pack_end(self.data_dir_entry, True, True, 0)
         box.pack_start(dir_box, False, False, 0)
 
+        # Word of the Day settings
+        section = self._make_section("WORD OF THE DAY")
+        box.pack_start(section, False, False, 0)
+
+        self.wotd_check = Gtk.CheckButton(label="Enable Word of the Day")
+        wotd_enabled = self.vocab_service.get_setting("wotd_enabled", "false") == "true"
+        self.wotd_check.set_active(wotd_enabled)
+        box.pack_start(self.wotd_check, False, False, 0)
+
+        level_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        level_box.pack_start(Gtk.Label("Level:"), False, False, 0)
+        self.wotd_level_combo = Gtk.ComboBoxText()
+        for level in CEFR_LEVELS:
+            self.wotd_level_combo.append(level, level)
+        
+        current_level = self.vocab_service.get_setting("wotd_level", "B2")
+        self.wotd_level_combo.set_active_id(current_level)
+        level_box.pack_end(self.wotd_level_combo, False, False, 0)
+        box.pack_start(level_box, False, False, 0)
+
         # Buttons
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         
@@ -228,10 +249,12 @@ class SettingsWindow(Gtk.Window):
             "translation_provider": self.provider_combo.get_active_id(),
             "target_lang": self.lang_combo.get_active_id(),
             "autostart": "true" if self.autostart_check.get_active() else "false",
+            "wotd_enabled": "true" if self.wotd_check.get_active() else "false",
+            "wotd_level": self.wotd_level_combo.get_active_id(),
         }
         
-        # Save data_dir to config file instead of DB
         new_data_dir = self.data_dir_entry.get_text().strip()
+        
         data_dir_changed = False
         if self.config_file:
             config = read_config(self.config_file)

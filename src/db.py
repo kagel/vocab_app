@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Database module for vocab app using SQLAlchemy."""
 
-import csv
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -10,27 +9,33 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey
 from sqlalchemy import func, and_
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session, scoped_session
 
+
+def _utc_timestamp() -> int:
+    """Get current UTC timestamp."""
+    return int(time.time())
+
+
 Base = declarative_base()
 
 
 class Language(Base):
     __tablename__ = 'languages'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     code = Column(String, unique=True, nullable=False)
     name = Column(String, nullable=False)
     abbreviation = Column(String, nullable=False)
-    
+
     translations = relationship("Translation", back_populates="language")
 
 
 class Word(Base):
     __tablename__ = 'words'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     phrase = Column(String, unique=True, nullable=False)
-    created_at = Column(Integer, nullable=False, default=lambda: int(time.time()))
-    
+    created_at = Column(Integer, nullable=False, default=_utc_timestamp)
+
     translations = relationship("Translation", back_populates="word", cascade="all, delete-orphan")
     stats = relationship("WordStats", back_populates="word", uselist=False, cascade="all, delete-orphan")
     history = relationship("History", back_populates="word", cascade="all, delete-orphan")
@@ -38,45 +43,55 @@ class Word(Base):
 
 class Translation(Base):
     __tablename__ = 'translations'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     word_id = Column(Integer, ForeignKey('words.id', ondelete='CASCADE'), nullable=False)
     translation = Column(String, nullable=False)
     language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
-    created_at = Column(Integer, nullable=False, default=lambda: int(time.time()))
-    
+    created_at = Column(Integer, nullable=False, default=_utc_timestamp)
+
     word = relationship("Word", back_populates="translations")
     language = relationship("Language", back_populates="translations")
-    
+
     __table_args__ = (UniqueConstraint('word_id', 'language_id', name='_word_lang_uc'),)
 
 
 class WordStats(Base):
     __tablename__ = 'word_stats'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     word_id = Column(Integer, ForeignKey('words.id', ondelete='CASCADE'), nullable=False, unique=True)
     interval_days = Column(Integer, nullable=False, default=1)
-    due_date = Column(Integer, nullable=False, default=lambda: int(time.time()))
+    due_date = Column(Integer, nullable=False, default=_utc_timestamp)
     ease_factor = Column(Float, nullable=False, default=2.5)
     last_reviewed = Column(Integer, nullable=True)
-    
+
     word = relationship("Word", back_populates="stats")
 
 
 class History(Base):
     __tablename__ = 'history'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     word_id = Column(Integer, ForeignKey('words.id', ondelete='CASCADE'), nullable=False)
-    reviewed_at = Column(Integer, nullable=False, default=lambda: int(time.time()))
-    
+    reviewed_at = Column(Integer, nullable=False, default=_utc_timestamp)
+
     word = relationship("Word", back_populates="history")
+
+
+class WOTDHistory(Base):
+    __tablename__ = 'wotd_history'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    word = Column(String, nullable=False)
+    level = Column(String, nullable=False)
+    shown_date = Column(String, nullable=False)  # YYYY-MM-DD format
+    created_at = Column(Integer, nullable=False, default=_utc_timestamp)
 
 
 class Setting(Base):
     __tablename__ = 'settings'
-    
+
     key = Column(String, primary_key=True)
     value = Column(String, nullable=False)
 
@@ -130,15 +145,15 @@ class Database:
             ("zh", "Chinese", "ZH"),
             ("ko", "Korean", "KO"),
         ]
-        
+
         # Get all existing codes in one query
         existing_codes = {lang.code for lang in self.session.query(Language.code).all()}
-        
+
         for code, name, abbrev in default_languages:
             if code not in existing_codes:
                 lang = Language(code=code, name=name, abbreviation=abbrev)
                 self.session.add(lang)
-        
+
         self._commit()
 
     def get_language_by_code(self, code: str) -> Optional[Language]:
@@ -155,7 +170,7 @@ class Database:
         word = self.session.query(Word).filter_by(phrase=phrase).first()
         if word:
             return word.id
-        
+
         word = Word(phrase=phrase)
         self.session.add(word)
         self._commit()
@@ -166,22 +181,22 @@ class Database:
         word = self.session.query(Word).filter_by(phrase=phrase.lower()).first()
         if not word:
             return None
-        
+
         result = {
             "id": word.id,
             "phrase": word.phrase,
             "created_at": word.created_at
         }
-        
+
         if word.stats:
             result["interval_days"] = word.stats.interval_days
             result["due_date"] = word.stats.due_date
             result["ease_factor"] = word.stats.ease_factor
-        
+
         translations = word.translations
         if translations:
             result["translation"] = translations[0].translation
-        
+
         return result
 
     def word_exists(self, phrase: str) -> bool:
@@ -193,17 +208,17 @@ class Database:
         lang = self.get_language_by_code(target_lang)
         if not lang:
             return
-        
+
         existing = self.session.query(Translation).filter_by(
             word_id=word_id, language_id=lang.id
         ).first()
-        
+
         if existing:
             existing.translation = translation
         else:
             trans = Translation(word_id=word_id, translation=translation, language_id=lang.id)
             self.session.add(trans)
-        
+
         self._commit()
 
     def get_translation(self, word_id: int, target_lang: str = "ru") -> Optional[str]:
@@ -219,7 +234,7 @@ class Database:
     def update_word_stats(self, word_id: int, interval_days: int, due_date: int, ease_factor: float):
         """Update word stats."""
         stats = self.session.query(WordStats).filter_by(word_id=word_id).first()
-        
+
         if stats:
             stats.interval_days = interval_days
             stats.due_date = due_date
@@ -234,7 +249,7 @@ class Database:
                 last_reviewed=int(time.time())
             )
             self.session.add(stats)
-        
+
         self._commit()
 
     def get_word_stats(self, word_id: int) -> Optional[dict]:
@@ -254,9 +269,9 @@ class Database:
     def get_due_words(self, limit: int = 20, target_lang: str = None) -> list:
         """Get words that are due for review, filtered and sorted in SQL."""
         now = int(datetime.now(timezone.utc).timestamp())
-        
+
         query = self.session.query(Word).outerjoin(WordStats)
-        
+
         if target_lang:
             lang = self.get_language_by_code(target_lang)
             if lang:
@@ -265,12 +280,12 @@ class Database:
                 ).filter(Translation.id != None)
             else:
                 return []
-        
+
         words = query.order_by(
             func.coalesce(WordStats.due_date, 0).asc(),
             func.coalesce(WordStats.interval_days, 1).asc()
         ).limit(limit).all()
-        
+
         results = []
         for word in words:
             result = {
@@ -283,7 +298,7 @@ class Database:
                 "urgency": 100
             }
             results.append(result)
-        
+
         return results
 
     def get_all_words(self, search: str = None, target_lang: str = None) -> list:
@@ -293,7 +308,7 @@ class Database:
             lang = self.get_language_by_code(target_lang)
             if not lang:
                 return []
-        
+
         # Build the main query
         if lang:
             # When filtering by language, use INNER join to only get words with that translation
@@ -310,7 +325,7 @@ class Database:
                 Translation.translation,
                 Language.code.label('lang_code'),
             ).join(Language, Language.id == Translation.language_id).subquery()
-            
+
             query = self.session.query(
                 Word,
                 func.coalesce(first_trans.c.translation, '').label('target'),
@@ -318,31 +333,31 @@ class Database:
             ).outerjoin(WordStats, WordStats.word_id == Word.id).outerjoin(
                 first_trans, first_trans.c.word_id == Word.id
             )
-        
+
         if search:
             search_term = f"%{search}%"
             if lang:
                 query = query.filter(
-                    (Word.phrase.ilike(search_term)) | 
+                    (Word.phrase.ilike(search_term)) |
                     (Translation.translation.ilike(search_term))
                 )
             else:
                 query = query.filter(Word.phrase.ilike(search_term))
-        
+
         # Use distinct to avoid duplicates
         rows = query.distinct(Word.id).order_by(Word.phrase).all()
-        
+
         results = []
         for row in rows:
             word = row[0]
             target = row[1]
-            
+
             # Get target_lang - from parameter if filtering, else from query
             if lang:
                 target_lang_code = target_lang
             else:
                 target_lang_code = row[2] if len(row) > 2 else ""
-            
+
             result = {
                 "id": word.id,
                 "phrase": word.phrase,
@@ -356,7 +371,7 @@ class Database:
                 "target_lang": target_lang_code or "",
             }
             results.append(result)
-        
+
         return results
 
     def delete_word(self, phrase: str):
@@ -410,7 +425,7 @@ class Database:
         ).distinct().order_by(
             func.date(History.reviewed_at, 'unixepoch').desc()
         ).all()
-        
+
         streak = 0
         if rows:
             review_dates = {row[0] for row in rows}
@@ -473,5 +488,24 @@ class Database:
         ).join(
             Word, Word.id == Translation.word_id
         ).group_by(Language.id).all()
-        
+
         return {row.code: (row.name, row.count) for row in results}
+
+    def mark_wotd_shown(self, word: str, level: str):
+        """Record a word as shown for today (UTC)."""
+        today = datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m-%d")
+        entry = WOTDHistory(word=word, level=level, shown_date=today)
+        self.session.add(entry)
+        self._commit()
+
+    def get_wotd_today(self) -> Optional[dict]:
+        """Get today's WOTD if shown, or None (UTC)."""
+        today = datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m-%d")
+        entry = self.session.query(WOTDHistory).filter_by(shown_date=today).first()
+        if entry:
+            return {
+                "word": entry.word,
+                "level": entry.level,
+                "shown_date": entry.shown_date
+            }
+        return None
