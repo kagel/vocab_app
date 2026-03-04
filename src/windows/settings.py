@@ -2,6 +2,7 @@
 """Settings window."""
 
 import os
+import plistlib
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -9,8 +10,47 @@ from gi.repository import Gtk, GLib
 
 from translation import ProviderRegistry
 from config import read_config, write_config
-from constants import AUTOSTART_FILE, DEFAULT_DATA_DIR
+from constants import AUTOSTART_DIR, AUTOSTART_FILE, DEFAULT_DATA_DIR, IS_MACOS
 from wotd import CEFR_LEVELS
+
+
+def _get_autostart_enabled() -> bool:
+    """Check if autostart is currently enabled."""
+    return os.path.exists(AUTOSTART_FILE)
+
+
+def _set_autostart(enabled: bool):
+    """Enable or disable autostart."""
+    if enabled:
+        os.makedirs(AUTOSTART_DIR, exist_ok=True)
+        script_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "vocab_gui.py")
+        python_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "venv", "bin", "python3")
+
+        if IS_MACOS:
+            # macOS LaunchAgent plist
+            plist = {
+                "Label": "com.vocab_app",
+                "ProgramArguments": [python_path, script_path],
+                "RunAtLoad": True,
+                "KeepAlive": False,
+            }
+            with open(AUTOSTART_FILE, "wb") as f:
+                plistlib.dump(plist, f)
+        else:
+            # Linux .desktop file
+            desktop_entry = f"""[Desktop Entry]
+Type=Application
+Name=Vocab App
+Exec={python_path} {script_path}
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+"""
+            with open(AUTOSTART_FILE, "w") as f:
+                f.write(desktop_entry)
+    else:
+        if os.path.exists(AUTOSTART_FILE):
+            os.remove(AUTOSTART_FILE)
 
 
 class SettingsWindow(Gtk.Window):
@@ -72,14 +112,14 @@ class SettingsWindow(Gtk.Window):
         self.provider_combo = Gtk.ComboBoxText()
         for provider, name in ProviderRegistry.list_providers():
             self.provider_combo.append(provider, name)
-        
+
         # Handle legacy "google" setting and default
         current_provider = self.vocab_service.get_settings().get("translation_provider", "google_direct")
         if current_provider == "google":
             current_provider = "google_direct"  # Legacy fallback
         if current_provider not in [p[0] for p in ProviderRegistry.list_providers()]:
             current_provider = "google_direct"  # Default if not found
-        
+
         self.provider_combo.set_active_id(current_provider)
         provider_box.pack_end(self.provider_combo, False, False, 0)
         box.pack_start(provider_box, False, False, 0)
@@ -100,26 +140,30 @@ class SettingsWindow(Gtk.Window):
         test_btn = Gtk.Button(label="Test API")
         test_btn.connect("clicked", self.on_test_api)
         test_btn_box.pack_start(test_btn, False, False, 0)
-        
+
         self.test_spinner = Gtk.Spinner()
         self.test_spinner.set_size_request(20, 20)
         self.test_spinner.hide()
         test_btn_box.pack_start(self.test_spinner, False, False, 0)
-        
+
         self.test_status_label = Gtk.Label("")
         self.test_status_label.set_xalign(0)
         self.test_status_label.set_line_wrap(True)
         self.test_status_label.hide()
         test_btn_box.pack_start(self.test_status_label, True, True, 0)
-        
+
         box.pack_start(test_btn_box, False, False, 0)
 
         # Keyboard shortcuts
         section = self._make_section("KEYBOARD SHORTCUTS")
         box.pack_start(section, False, False, 0)
 
-        # Info label
-        info_label = Gtk.Label("Configure hotkeys in your desktop environment:\n(Usually Settings → Keyboard → Shortcuts)\n\nCommands:")
+        # Info label - platform-specific instructions
+        if IS_MACOS:
+            shortcut_info = "Configure hotkeys in System Settings → Keyboard → Shortcuts → Services\nor use a tool like Hammerspoon / Karabiner.\n\nCommands:"
+        else:
+            shortcut_info = "Configure hotkeys in your desktop environment:\n(Usually Settings → Keyboard → Shortcuts)\n\nCommands:"
+        info_label = Gtk.Label(shortcut_info)
         info_label.set_xalign(0)
         info_label.set_line_wrap(True)
         box.pack_start(info_label, False, False, 0)
@@ -137,8 +181,7 @@ class SettingsWindow(Gtk.Window):
         box.pack_start(section, False, False, 0)
 
         self.autostart_check = Gtk.CheckButton(label="Start with system login")
-        # Check both DB setting and actual file existence
-        autostart = os.path.exists(AUTOSTART_FILE)
+        autostart = _get_autostart_enabled()
         self.autostart_check.set_active(autostart)
         box.pack_start(self.autostart_check, False, False, 0)
 
@@ -154,11 +197,11 @@ class SettingsWindow(Gtk.Window):
         # Custom data directory (read from config file)
         dir_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         dir_box.pack_start(Gtk.Label("Custom Path:"), False, False, 0)
-        
+
         # Read from config file if available (JSON)
         config = read_config(self.config_file) if self.config_file else {}
         custom_data_dir = config.get("data_dir", "")
-        
+
         self.data_dir_entry = Gtk.Entry()
         self.data_dir_entry.set_text(custom_data_dir)
         dir_box.pack_end(self.data_dir_entry, True, True, 0)
@@ -178,7 +221,7 @@ class SettingsWindow(Gtk.Window):
         self.wotd_level_combo = Gtk.ComboBoxText()
         for level in CEFR_LEVELS:
             self.wotd_level_combo.append(level, level)
-        
+
         current_level = self.vocab_service.get_setting("wotd_level", "B2")
         self.wotd_level_combo.set_active_id(current_level)
         level_box.pack_end(self.wotd_level_combo, False, False, 0)
@@ -186,7 +229,7 @@ class SettingsWindow(Gtk.Window):
 
         # Buttons
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        
+
         cancel_btn = Gtk.Button(label="Cancel")
         cancel_btn.connect("clicked", lambda _: self.destroy())
         btn_box.pack_start(cancel_btn, True, True, 0)
@@ -208,15 +251,15 @@ class SettingsWindow(Gtk.Window):
         """Test translation API."""
         provider = self.provider_combo.get_active_id()
         target_lang = self.lang_combo.get_active_id()
-        
+
         self.vocab_service.set_setting("translation_provider", provider)
         self.vocab_service.set_setting("target_lang", target_lang)
-        
+
         provider_name = ProviderRegistry.get(provider).get_name()
         self.test_status_label.set_text(f"Testing {provider_name}...")
         self.test_spinner.show()
         self.test_spinner.start()
-        
+
         def run_test():
             success = self.vocab_service.test_translation_api()
             GLib.idle_add(self._test_complete, success, provider_name)
@@ -230,11 +273,11 @@ class SettingsWindow(Gtk.Window):
         """Handle test completion."""
         self.test_spinner.stop()
         self.test_spinner.hide()
-        
+
         status = "Success!" if success else "Failed!"
         detail = "works." if success else "not working."
         self.test_status_label.set_text(f"{status} {provider_name} {detail}")
-        
+
         GLib.timeout_add(3000, self._clear_test_status)
 
     def _clear_test_status(self):
@@ -252,9 +295,9 @@ class SettingsWindow(Gtk.Window):
             "wotd_enabled": "true" if self.wotd_check.get_active() else "false",
             "wotd_level": self.wotd_level_combo.get_active_id(),
         }
-        
+
         new_data_dir = self.data_dir_entry.get_text().strip()
-        
+
         data_dir_changed = False
         if self.config_file:
             config = read_config(self.config_file)
@@ -266,6 +309,9 @@ class SettingsWindow(Gtk.Window):
 
         self.vocab_service.save_settings(settings)
 
+        # Handle autostart
+        _set_autostart(self.autostart_check.get_active())
+
         if self.on_save:
             self.on_save(settings)
 
@@ -274,7 +320,7 @@ class SettingsWindow(Gtk.Window):
             msg_text = "Settings saved!\n\nNote: You need to restart the app for data directory changes to take effect."
         else:
             msg_text = "Settings saved successfully!"
-        
+
         msg = Gtk.MessageDialog(
             self,
             Gtk.DialogFlags.DESTROY_WITH_PARENT,

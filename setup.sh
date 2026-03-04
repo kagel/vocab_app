@@ -8,8 +8,19 @@ cd "$SCRIPT_DIR"
 
 echo "Setting up Vocab GUI app..."
 
-# Detect package manager
-if command -v pacman &>/dev/null; then
+OS="$(uname -s)"
+
+if [ "$OS" = "Darwin" ]; then
+    # macOS
+    if ! command -v brew &>/dev/null; then
+        echo "Homebrew is required. Install it from https://brew.sh"
+        exit 1
+    fi
+
+    echo "Installing system dependencies (Homebrew)..."
+    brew install gtk+3 pygobject3 adwaita-icon-theme
+
+elif command -v pacman &>/dev/null; then
     # Arch/Manjaro
     echo "Installing system dependencies (pacman)..."
     sudo pacman -S --noconfirm \
@@ -28,7 +39,8 @@ elif command -v apt &>/dev/null; then
 
 else
     echo "Unsupported package manager. Please install manually:"
-    echo "  - python-gobject, gtk3, libappindicator-gtk3"
+    echo "  - python-gobject, gtk3, libappindicator-gtk3 (Linux)"
+    echo "  - gtk+3, pygobject3 (macOS via Homebrew)"
     exit 1
 fi
 
@@ -51,5 +63,11 @@ echo "To run the app:"
 echo "  source venv/bin/activate"
 echo "  python3 src/vocab_gui.py"
 echo ""
-echo "To start on login, add to your desktop's autostart:"
-echo "  $SCRIPT_DIR/venv/bin/python3 $SCRIPT_DIR/src/vocab_gui.py"
+if [ "$OS" = "Darwin" ]; then
+    echo "To set up keyboard shortcuts on macOS:"
+    echo "  Use System Settings → Keyboard → Shortcuts → Services"
+    echo "  or a tool like Hammerspoon / Karabiner."
+else
+    echo "To start on login, add to your desktop's autostart:"
+    echo "  $SCRIPT_DIR/venv/bin/python3 $SCRIPT_DIR/src/vocab_gui.py"
+fi

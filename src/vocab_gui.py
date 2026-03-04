@@ -9,15 +9,24 @@ import time
 import gi
 
 gi.require_version('Gtk', '3.0')
-gi.require_version('AppIndicator3', '0.1')
-from gi.repository import Gtk, AppIndicator3
+from gi.repository import Gtk, GdkPixbuf
 
-from constants import CONFIG_FILE, TEMP_PHRASE_FILE
+from constants import CONFIG_FILE, TEMP_PHRASE_FILE, IS_MACOS, IS_LINUX
 from helpers import notify_cli, init_vocab_service
 from windows.stats import StatsWindow
 from windows.settings import SettingsWindow
 from windows.add_word import AddWordDialog
 from windows.word_browser import WordBrowserWindow
+
+# AppIndicator3 is only available on Linux
+_has_appindicator = False
+if IS_LINUX:
+    try:
+        gi.require_version('AppIndicator3', '0.1')
+        from gi.repository import AppIndicator3
+        _has_appindicator = True
+    except (ValueError, ImportError):
+        pass
 
 
 class VocabTrayApp:
@@ -25,6 +34,8 @@ class VocabTrayApp:
 
     def _get_desktop_environment(self) -> str:
         """Detect desktop environment."""
+        if IS_MACOS:
+            return "macos"
         xdg_current_desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
         if "gnome" in xdg_current_desktop:
             return "gnome"
@@ -39,7 +50,7 @@ class VocabTrayApp:
     def __init__(self):
         # Config file path
         self.config_file = CONFIG_FILE
-        
+
         # Initialize services
         self.vocab_service = init_vocab_service(self.config_file)
         if not self.vocab_service:
@@ -52,7 +63,7 @@ class VocabTrayApp:
             )
             error_dialog.run()
             sys.exit(1)
-        
+
         # Set default settings if not set
         self._init_default_settings()
 
@@ -62,21 +73,14 @@ class VocabTrayApp:
         self.running = True
         self.settings_changed = threading.Event()
 
-        # Create indicator with custom icon
-        tray_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons", "tray_text.svg")
-        self.indicator = AppIndicator3.Indicator.new(
-            "vocab-app",
-            tray_icon_path if os.path.exists(tray_icon_path) else "dialog-information",
-            AppIndicator3.IndicatorCategory.SYSTEM_SERVICES
-        )
-        self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
-        self.indicator.set_menu(self.create_menu())
+        # Create system tray
+        self._setup_tray()
 
         # Start review loop
         self.review_thread = threading.Thread(target=self.review_loop, daemon=True)
         self.review_thread.start()
 
-        # GNOME tray warning (one-time)
+        # GNOME tray warning (one-time, Linux only)
         if self._get_desktop_environment() in ("gnome", "ubuntu"):
             if not self.vocab_service.get_setting("gnome_tray_warning_shown"):
                 self.notify("GNOME detected. If tray icon is missing, install 'Top Icons' or 'Tray Icons' extension.", "Vocab")
@@ -84,6 +88,47 @@ class VocabTrayApp:
 
         # Word of the Day (delayed to not block startup)
         threading.Timer(2.0, self.check_wotd).start()
+
+    def _setup_tray(self):
+        """Set up system tray icon - uses AppIndicator3 on Linux, StatusIcon on macOS."""
+        tray_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons", "tray_text.svg")
+        menu = self.create_menu()
+
+        if _has_appindicator:
+            # Linux with AppIndicator3
+            self.indicator = AppIndicator3.Indicator.new(
+                "vocab-app",
+                tray_icon_path if os.path.exists(tray_icon_path) else "dialog-information",
+                AppIndicator3.IndicatorCategory.SYSTEM_SERVICES
+            )
+            self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+            self.indicator.set_menu(menu)
+        else:
+            # macOS or Linux without AppIndicator3: use GtkStatusIcon
+            self.status_icon = Gtk.StatusIcon()
+            if os.path.exists(tray_icon_path):
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(tray_icon_path, 22, 22)
+                self.status_icon.set_from_pixbuf(pixbuf)
+            else:
+                self.status_icon.set_from_icon_name("dialog-information")
+            self.status_icon.set_tooltip_text("Vocab App")
+            self.status_icon.set_visible(True)
+            self._tray_menu = menu
+            self.status_icon.connect("popup-menu", self._on_status_icon_popup)
+            self.status_icon.connect("activate", self._on_status_icon_activate)
+
+    def _on_status_icon_popup(self, icon, button, activate_time):
+        """Handle right-click on StatusIcon."""
+        self._tray_menu.popup(None, None, Gtk.StatusIcon.position_menu, icon, button, activate_time)
+
+    def _on_status_icon_activate(self, icon):
+        """Handle left-click on StatusIcon - show menu."""
+        self._tray_menu.popup(None, None, Gtk.StatusIcon.position_menu, icon, 1, Gtk.get_current_event_time())
+
+    def set_tray_label(self, text):
+        """Set tray label text (only supported with AppIndicator3)."""
+        if _has_appindicator and hasattr(self, 'indicator'):
+            self.indicator.set_label(text, "vocab-app")
 
     def notify(self, body, title="Vocab"):
         """Send notification with icon."""
@@ -116,8 +161,7 @@ class VocabTrayApp:
         menu.append(self.pause_item)
 
         # Separator
-        sep1 = Gtk.MenuItem(label="───────────")
-        sep1.set_sensitive(False)
+        sep1 = Gtk.SeparatorMenuItem()
         menu.append(sep1)
 
         # Add word
@@ -141,8 +185,7 @@ class VocabTrayApp:
         menu.append(settings_item)
 
         # Separator
-        sep2 = Gtk.MenuItem(label="───────────")
-        sep2.set_sensitive(False)
+        sep2 = Gtk.SeparatorMenuItem()
         menu.append(sep2)
 
         # Quit
@@ -223,7 +266,7 @@ class VocabTrayApp:
         if word:
             self.current_word = word
             self.show_word_popup(word)
-            self.indicator.set_label(str(word.get("phrase", ""))[:20], "vocab-app")
+            self.set_tray_label(str(word.get("phrase", ""))[:20])
 
     def on_show_stats(self, widget):
         """Show stats window."""
@@ -233,7 +276,7 @@ class VocabTrayApp:
     def on_add_word(self, widget):
         """Show add word dialog."""
         def on_add(word):
-            self.indicator.set_label(word[:20], "vocab-app")
+            self.set_tray_label(word[:20])
 
         win = AddWordDialog(self.vocab_service, on_add)
         win.show_all()
