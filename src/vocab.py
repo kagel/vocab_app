@@ -22,6 +22,7 @@ class VocabService:
         """Get app settings."""
         return {
             "review_interval": int(self.db.get_setting("review_interval", "3600")),
+            "source_lang": self.db.get_setting("source_lang", "en"),
             "target_lang": self.db.get_setting("target_lang", "ru"),
             "translation_provider": self.db.get_setting("translation_provider", "google_direct"),
         }
@@ -92,17 +93,18 @@ X-GNOME-Autostart-enabled=true
         if existing:
             # Word exists - add/update translation if provided or auto_translate
             target_lang = self.db.get_setting("target_lang", "ru") or "ru"
-            
+
             if translation:
                 self.db.add_translation(existing["id"], translation, target_lang)
             elif auto_translate:
                 provider_name = self.db.get_setting("translation_provider", "google_direct") or "google_direct"
+                source_lang = self.db.get_setting("source_lang", "en") or "en"
                 provider = ProviderRegistry.get(provider_name)
-                trans = provider.translate(phrase, target_lang)
+                trans = provider.translate(phrase, target_lang, source_lang)
                 if trans:
                     self.db.add_translation(existing["id"], trans, target_lang)
             return existing
-        
+
         # New word
         word_id = self.db.add_word(phrase)
 
@@ -111,9 +113,10 @@ X-GNOME-Autostart-enabled=true
             self.db.add_translation(word_id, translation, target_lang)
         elif auto_translate:
             provider_name = self.db.get_setting("translation_provider", "google_direct") or "google_direct"
+            source_lang = self.db.get_setting("source_lang", "en") or "en"
             provider = ProviderRegistry.get(provider_name)
             target_lang = self.db.get_setting("target_lang", "ru") or "ru"
-            trans = provider.translate(phrase, target_lang)
+            trans = provider.translate(phrase, target_lang, source_lang)
             if trans:
                 self.db.add_translation(word_id, trans, target_lang)
 
@@ -323,7 +326,9 @@ X-GNOME-Autostart-enabled=true
         try:
             provider_name = self.db.get_setting("translation_provider", "google_direct")
             provider = ProviderRegistry.get(provider_name)
-            result = provider.translate("hello", self.db.get_setting("target_lang", "ru"))
+            source_lang = self.db.get_setting("source_lang", "en") or "en"
+            target_lang = self.db.get_setting("target_lang", "ru") or "ru"
+            result = provider.translate("hello", target_lang, source_lang)
             return bool(result)
         except:
             return False
@@ -365,9 +370,10 @@ X-GNOME-Autostart-enabled=true
 
         provider_name = self.db.get_setting("translation_provider", "google_direct")
         provider = ProviderRegistry.get(provider_name)
+        source_lang = self.db.get_setting("source_lang", "en") or "en"
         target_lang = self.db.get_setting("target_lang", "ru")
 
-        translation = provider.translate(word, target_lang)
+        translation = provider.translate(word, target_lang, source_lang)
         
         if not translation:
             return None
