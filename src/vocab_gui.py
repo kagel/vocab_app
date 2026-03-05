@@ -94,6 +94,7 @@ class VocabTrayApp:
         """Initialize default settings if not set."""
         defaults = {
             "review_interval": "3600",
+            "source_lang": "en",
             "target_lang": "ru",
             "translation_provider": "google",
             "autostart": "false",

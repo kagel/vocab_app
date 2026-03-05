@@ -124,6 +124,17 @@ class SettingsWindow(Gtk.Window):
         provider_box.pack_end(self.provider_combo, False, False, 0)
         box.pack_start(provider_box, False, False, 0)
 
+        # Source language
+        src_lang_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        src_lang_box.pack_start(Gtk.Label("Source Language:"), False, False, 0)
+        self.src_lang_combo = Gtk.ComboBoxText()
+        for lang in self.vocab_service.get_languages():
+            self.src_lang_combo.append(lang.code, lang.name)
+        current_src_lang = self.vocab_service.get_settings().get("source_lang", "en")
+        self.src_lang_combo.set_active_id(current_src_lang)
+        src_lang_box.pack_end(self.src_lang_combo, False, False, 0)
+        box.pack_start(src_lang_box, False, False, 0)
+
         # Target language
         lang_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         lang_box.pack_start(Gtk.Label("Target Language:"), False, False, 0)
@@ -250,9 +261,11 @@ class SettingsWindow(Gtk.Window):
     def on_test_api(self, widget):
         """Test translation API."""
         provider = self.provider_combo.get_active_id()
+        source_lang = self.src_lang_combo.get_active_id()
         target_lang = self.lang_combo.get_active_id()
 
         self.vocab_service.set_setting("translation_provider", provider)
+        self.vocab_service.set_setting("source_lang", source_lang)
         self.vocab_service.set_setting("target_lang", target_lang)
 
         provider_name = ProviderRegistry.get(provider).get_name()
@@ -290,6 +303,7 @@ class SettingsWindow(Gtk.Window):
         settings = {
             "review_interval": self.interval_combo.get_active_id(),
             "translation_provider": self.provider_combo.get_active_id(),
+            "source_lang": self.src_lang_combo.get_active_id(),
             "target_lang": self.lang_combo.get_active_id(),
             "autostart": "true" if self.autostart_check.get_active() else "false",
             "wotd_enabled": "true" if self.wotd_check.get_active() else "false",
