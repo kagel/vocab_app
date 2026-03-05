@@ -34,5 +34,18 @@ DB_FILENAME = "vocab.db"
 # Temp files
 TEMP_PHRASE_FILE = os.path.join(tempfile.gettempdir(), "last_vocab_phrase")
 
-# Icon directory (relative to src/)
-ICON_DIR = "icons"
+# Icon directory
+ICONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons")
+
+# Tray menu items: (label, callback_key) or None for separator
+MENU_ITEMS = [
+    ("Show next word", "show_next"),
+    ("Pause (1 hour)", "pause"),
+    None,
+    ("Add word", "add_word"),
+    ("Word Browser", "word_browser"),
+    ("Stats", "stats"),
+    ("Settings", "settings"),
+    None,
+    ("Quit", "quit"),
+]

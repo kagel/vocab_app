@@ -54,6 +54,11 @@ venv/bin/python3 -m ensurepip --upgrade
 venv/bin/python3 -m pip install --upgrade pip
 venv/bin/python3 -m pip install -r requirements.txt
 
+if [ "$OS" = "Darwin" ]; then
+    echo "Installing macOS-specific dependencies..."
+    venv/bin/python3 -m pip install pyobjc-framework-Cocoa
+fi
+
 # Verify key imports work
 echo "Verifying installation..."
 venv/bin/python3 -c "import gi; gi.require_version('Gtk', '3.0'); from gi.repository import Gtk; print('  GTK3: OK')"

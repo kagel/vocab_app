@@ -16,14 +16,20 @@ ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons", "t
 
 
 def notify_cli(body, title="Vocab"):
-    """Send notification - uses osascript on macOS, notify-send on Linux."""
+    """Send notification - uses terminal-notifier on macOS, notify-send on Linux."""
     if IS_MACOS:
-        # Use osascript for macOS native notifications
-        # Strip HTML tags for macOS (it doesn't support them)
         import re
+        import shutil
         clean_body = re.sub(r'<[^>]+>', '', body)
-        script = f'display notification "{clean_body}" with title "{title}"'
-        subprocess.run(["osascript", "-e", script], check=False)
+        if shutil.which("terminal-notifier"):
+            subprocess.run(
+                ["terminal-notifier", "-title", title, "-message", clean_body],
+                check=False,
+            )
+        else:
+            # Fallback to osascript (may be silently blocked)
+            script = f'display notification "{clean_body}" with title "{title}"'
+            subprocess.run(["osascript", "-e", script], check=False)
     else:
         args = ["notify-send", "-u", "low", title, body]
         if os.path.exists(ICON_PATH):
